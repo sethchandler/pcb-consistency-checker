@@ -1,0 +1,21 @@
+{
+  "name": "pcb-consistency-checker",
+  "version": "1.0.0",
+  "description": "Standalone consistency checker for PedagogicCaseBuilder case files",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "check": "node index.js",
+    "web": "node web-server.js"
+  },
+  "dependencies": {
+    "commander": "^11.1.0",
+    "openai": "^4.24.1",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "keywords": ["consistency", "legal", "case", "analysis", "ai"],
+  "author": "PedagogicCaseBuilder Team",
+  "license": "MIT"
+}

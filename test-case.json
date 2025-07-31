@@ -1,0 +1,39 @@
+{
+  "caseFile": [
+    ["goal-1", {
+      "id": "goal-1",
+      "type": "GOALS",
+      "title": "Learning Objectives",
+      "content": "Students will understand contract law principles and identify inconsistencies in business agreements.",
+      "dependencies": [],
+      "status": "complete"
+    }],
+    ["case-1", {
+      "id": "case-1", 
+      "type": "CASE",
+      "title": "Smith vs. Jones Contract Dispute",
+      "content": "ABC Company signed a contract with XYZ Corp on March 15, 2024 for $50,000 worth of services to be delivered within 30 days.",
+      "dependencies": ["goal-1"],
+      "status": "complete"
+    }],
+    ["witness-1", {
+      "id": "witness-1",
+      "type": "WITNESS", 
+      "title": "John Smith - CEO Testimony",
+      "content": "I clearly remember signing the contract with XYZ Corp on March 16, 2024. The amount was $45,000 and we agreed to a 45-day delivery timeline.",
+      "dependencies": ["case-1"],
+      "status": "complete"
+    }],
+    ["doc-1", {
+      "id": "doc-1",
+      "type": "DOCUMENT",
+      "title": "Signed Contract",
+      "content": "Contract between ABC Company and XYZ Corporation. Date: March 15, 2024. Amount: $50,000. Delivery period: 30 days from signing.",
+      "dependencies": ["case-1"],
+      "status": "complete"
+    }]
+  ],
+  "exportedAt": "2025-01-31T12:00:00.000Z",
+  "version": "1.0",
+  "exportType": "full"
+}
