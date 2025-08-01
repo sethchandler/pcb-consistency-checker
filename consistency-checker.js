@@ -540,25 +540,35 @@ async function runConsistencyCheck() {
 
         const formattedContent = formatStructuredDocuments(structuredDocuments);
         
-        // Step 4: Run consistency analysis
-        const fullPrompt = currentPrompt.replace('[CASE FILE CONTENT FOLLOWS]', formattedContent);
-        const response = await callOpenAI(fullPrompt, apiKey);
+        // Step 4: Run consistency analysis using core function
+        const analysisResult = await consistencyCheckCore.analyzeConsistency({
+            prompt: currentPrompt,
+            content: formattedContent,
+            apiKey: apiKey,
+            model: document.getElementById('modelSelect').value,
+            outputFormat: 'markdown' // We'll parse markdown to maintain compatibility
+        });
         
-        // Parse results
-        const inconsistencies = parseConsistencyTable(response);
+        if (!analysisResult.success) {
+            throw new Error(analysisResult.error);
+        }
+        
+        // Parse results from markdown response
+        const inconsistencies = parseConsistencyTable(analysisResult.data);
         
         analysisResults = {
             success: true,
             inconsistencies: inconsistencies,
-            rawResponse: response,
-            analyzedAt: new Date().toISOString(),
-            model: document.getElementById('modelSelect').value,
+            rawResponse: analysisResult.data,
+            analyzedAt: analysisResult.timestamp,
+            model: analysisResult.model,
             structuredDocuments: structuredDocuments,
             statistics: {
                 totalFiles: uploadedFiles.length,
                 processedFiles: structuredDocuments.length,
                 contentLength: formattedContent.length,
-                inconsistenciesFound: inconsistencies.length
+                inconsistenciesFound: inconsistencies.length,
+                tokensUsed: analysisResult.usage.totalTokens
             }
         };
         
@@ -567,7 +577,27 @@ async function runConsistencyCheck() {
         exportActions.style.display = 'flex';
         
     } catch (error) {
-        showError('Analysis failed: ' + error.message);
+        // Check if it's a structured error from our core function
+        if (error.errorCode) {
+            switch (error.errorCode) {
+                case consistencyCheckCore.ERROR_CODES.INVALID_API_KEY:
+                    showError('Invalid API key. Please check your OpenAI API key configuration.');
+                    break;
+                case consistencyCheckCore.ERROR_CODES.RATE_LIMIT:
+                    showError('API rate limit exceeded. Please wait a moment and try again.');
+                    break;
+                case consistencyCheckCore.ERROR_CODES.MODEL_NOT_FOUND:
+                    showError(`Model not available: ${error.message}`);
+                    break;
+                case consistencyCheckCore.ERROR_CODES.QUOTA_EXCEEDED:
+                    showError('API quota exceeded. Please check your OpenAI account.');
+                    break;
+                default:
+                    showError('Analysis failed: ' + error.message);
+            }
+        } else {
+            showError('Analysis failed: ' + error.message);
+        }
     } finally {
         button.disabled = false;
         updateCheckButton();
@@ -614,29 +644,37 @@ CONTENT: [CONTENT]
             }
             
             // Prepare classification prompt
-            const prompt = classificationPrompt
+            const documentContent = fileData.content.substring(0, 4000); // Limit content length
+            const fullPrompt = classificationPrompt
                 .replace('[FILENAME]', fileData.name)
-                .replace('[CONTENT]', fileData.content.substring(0, 4000)); // Limit content length
+                .replace('[CONTENT]', documentContent);
             
-            // Call AI for classification
-            const response = await callOpenAI(prompt, apiKey);
+            // Call AI for classification using core function
+            const classificationResult = await consistencyCheckCore.analyzeConsistency({
+                prompt: fullPrompt,
+                content: '', // Content is already in the prompt
+                apiKey: apiKey,
+                model: 'gpt-4o-mini', // Use default model for classification
+                outputFormat: 'json'
+            });
             
             // Parse AI response
             let enhanced_metadata;
-            try {
-                enhanced_metadata = JSON.parse(response.trim());
-            } catch (parseError) {
-                console.error('Failed to parse AI response for', fileData.name, ':', parseError);
+            if (classificationResult.success && classificationResult.data) {
+                // For classification, the entire response is our metadata
+                enhanced_metadata = classificationResult.data;
+            } else {
+                console.error('Classification failed for', fileData.name, ':', classificationResult.error);
                 enhanced_metadata = {
                     document_type: 'other',
                     title: fileData.name,
                     parties: [],
                     dates: [],
                     locations: [],
-                    key_facts: ['Document content could not be automatically structured'],
+                    key_facts: ['Document classification failed: ' + (classificationResult.error || 'Unknown error')],
                     financial_amounts: [],
                     references: [],
-                    confidence: 0.1
+                    confidence: 0.0
                 };
             }
             
@@ -723,47 +761,7 @@ function formatStructuredDocuments(structuredDocuments) {
     return formattedContent;
 }
 
-// Call OpenAI API
-async function callOpenAI(prompt, apiKey) {
-    const selectedModel = document.getElementById('modelSelect').value;
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: selectedModel,
-            messages: [
-                {
-                    role: 'system',
-                    content: 'You are an expert legal analyst specializing in identifying factual inconsistencies in case files.'
-                },
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
-            temperature: 0.3,
-            max_tokens: 2000
-        })
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (response.status === 401) {
-            throw new Error('Invalid API key. Please check your OpenAI API key.');
-        } else if (response.status === 429) {
-            throw new Error('API rate limit exceeded. Please try again later.');
-        } else {
-            throw new Error(`API error (${response.status}): ${errorData.error?.message || 'Unknown error'}`);
-        }
-    }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
-}
+// Note: OpenAI API calls are now handled by consistencyCheckCore.js
 
 // Parse consistency table from AI response
 function parseConsistencyTable(markdownResponse) {
@@ -829,6 +827,7 @@ function displayResults(results) {
                     <li>Files processed: ${results.statistics.totalFiles || results.statistics.totalComponents || 0}</li>
                     <li>Documents structured: ${results.statistics.processedFiles || 'N/A'}</li>
                     <li>Content length: ${results.statistics.contentLength.toLocaleString()} characters</li>
+                    <li>Tokens used: ${results.statistics.tokensUsed ? results.statistics.tokensUsed.toLocaleString() : 'N/A'}</li>
                     <li>Analysis completed: ${new Date(results.analyzedAt).toLocaleString()}</li>
                 </ul>
             </div>
