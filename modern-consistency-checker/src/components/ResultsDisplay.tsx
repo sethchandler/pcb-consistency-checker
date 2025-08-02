@@ -1,22 +1,55 @@
-import React, { useState } from 'react';
-import { FileText, Clock, Users, Download, Copy, Check, ChevronDown, Brain } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { FileText, Clock, Users, Download, Copy, Check, ChevronDown, Brain, Sliders } from 'lucide-react';
 import { marked } from 'marked';
 import { useConsistencyStore } from '../store/useConsistencyStore';
 import { addTableNumbering, countInconsistencies } from '../utils/tableNumbering';
+import { tfIdfMerge } from '../utils/tfIdfMerge';
 
 const ResultsDisplay: React.FC = () => {
-  const { analysisResults, uploadedFiles } = useConsistencyStore();
+  const { 
+    analysisResults, 
+    uploadedFiles, 
+    rawPassResults, 
+    lastAnalysisSettings, 
+    mergeTheta 
+  } = useConsistencyStore();
   const [copied, setCopied] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
+  const [liveThetaValue, setLiveThetaValue] = useState(mergeTheta);
 
   if (!analysisResults) {
     return null;
   }
 
+  // Determine if we should show live theta controls and use live merging
+  const shouldUseLiveMerging = rawPassResults.length > 1 && 
+                               lastAnalysisSettings?.passStrategy === 'intersection';
+
+  // Compute live merged content when theta changes
+  const liveContent = useMemo(() => {
+    if (!shouldUseLiveMerging || rawPassResults.length < 2) {
+      return analysisResults.content; // Use stored content for single pass or union
+    }
+
+    // Perform progressive intersection merge with live theta
+    let result = rawPassResults[0];
+    for (let i = 1; i < rawPassResults.length; i++) {
+      const mergeResult = tfIdfMerge(result, rawPassResults[i], liveThetaValue);
+      result = mergeResult.content;
+    }
+    
+    return result;
+  }, [liveThetaValue, rawPassResults, shouldUseLiveMerging, analysisResults.content]);
+
+  // Count matches for the current theta
+  const currentMatchCount = useMemo(() => {
+    return countInconsistencies(liveContent);
+  }, [liveContent]);
+
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(addTableNumbering(analysisResults.content));
+      await navigator.clipboard.writeText(addTableNumbering(liveContent));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
@@ -41,7 +74,7 @@ const ResultsDisplay: React.FC = () => {
         mimeType = 'application/json';
         break;
       case 'html':
-        const htmlContent = marked(addTableNumbering(analysisResults.content), { gfm: true, breaks: true });
+        const htmlContent = marked(addTableNumbering(liveContent), { gfm: true, breaks: true });
         content = `<!DOCTYPE html>
 <html>
 <head>
@@ -66,7 +99,7 @@ const ResultsDisplay: React.FC = () => {
         mimeType = 'text/html';
         break;
       default: // 'md'
-        content = addTableNumbering(analysisResults.content);
+        content = addTableNumbering(liveContent);
         filename = `consistency-analysis-${timestamp}.md`;
         mimeType = 'text/markdown';
     }
@@ -213,13 +246,73 @@ const ResultsDisplay: React.FC = () => {
         </div>
       </div>
 
+      {/* Live Theta Control for Multi-pass Intersection */}
+      {shouldUseLiveMerging && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-medium text-blue-800 flex items-center">
+              <Sliders className="mr-2" size={20} />
+              Live Similarity Threshold (θ)
+            </h3>
+            <span className="text-sm text-blue-600">
+              {currentMatchCount} match{currentMatchCount === 1 ? '' : 'es'} at θ={liveThetaValue.toFixed(2)}
+            </span>
+          </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-blue-700">
+              Threshold: {liveThetaValue.toFixed(2)} 
+              <span className="ml-2 text-xs text-blue-600">
+                (Adjust to see instant results)
+              </span>
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={liveThetaValue}
+              onChange={(e) => setLiveThetaValue(parseFloat(e.target.value))}
+              className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-blue-600">
+              <span>0.00 (Lenient)</span>
+              <span>0.50 (Moderate)</span>
+              <span>1.00 (Strict)</span>
+            </div>
+            <div className="flex justify-between mt-2">
+              <button
+                onClick={() => setLiveThetaValue(0.1)}
+                className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300"
+              >
+                Lenient (0.1)
+              </button>
+              <button
+                onClick={() => setLiveThetaValue(0.2)}
+                className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300"
+              >
+                Default (0.2)
+              </button>
+              <button
+                onClick={() => setLiveThetaValue(0.5)}
+                className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300"
+              >
+                Strict (0.5)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Analysis Content */}
       <div className="border border-gray-200 rounded-lg">
         <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-800">Analysis Report</h3>
             <span className="text-sm text-gray-600">
-              {countInconsistencies(analysisResults.content)} inconsistenc{countInconsistencies(analysisResults.content) === 1 ? 'y' : 'ies'} found
+              {currentMatchCount} inconsistenc{currentMatchCount === 1 ? 'y' : 'ies'} found
+              {shouldUseLiveMerging && (
+                <span className="ml-2 text-blue-600">(Live θ={liveThetaValue.toFixed(2)})</span>
+              )}
             </span>
           </div>
         </div>
@@ -227,7 +320,7 @@ const ResultsDisplay: React.FC = () => {
           <div 
             className="analysis-content prose prose-sm max-w-none"
             dangerouslySetInnerHTML={{ 
-              __html: marked(addTableNumbering(analysisResults.content), {
+              __html: marked(addTableNumbering(liveContent), {
                 gfm: true, // Enable GitHub Flavored Markdown (includes tables)
                 breaks: true
               })

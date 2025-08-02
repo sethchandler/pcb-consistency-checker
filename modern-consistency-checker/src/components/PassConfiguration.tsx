@@ -7,11 +7,9 @@ const PassConfiguration: React.FC = () => {
     numberOfPasses, 
     passStrategy, 
     temperatureSettings,
-    mergeTheta,
     setNumberOfPasses, 
     setPassStrategy,
-    setTemperatureSettings,
-    setMergeTheta
+    setTemperatureSettings
   } = useConsistencyStore();
   
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -263,33 +261,7 @@ const PassConfiguration: React.FC = () => {
               />
             </div>
 
-            {/* Merge Theta (Similarity Threshold) */}
-            {numberOfPasses > 1 && passStrategy === 'intersection' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Merge Similarity Threshold (θ): {mergeTheta.toFixed(2)}
-                  <span className="ml-1 text-xs text-gray-500 group relative cursor-help">
-                    <HelpCircle size={12} className="inline" />
-                    <span className="invisible group-hover:visible absolute bottom-6 left-0 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
-                      TF-IDF similarity threshold for matching fixes (0=lenient, 1=exact)
-                    </span>
-                  </span>
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={mergeTheta}
-                  onChange={(e) => setMergeTheta(parseFloat(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="text-xs text-gray-500 mt-1">
-                  Lower values = More matches (lenient)<br />
-                  Higher values = Fewer matches (strict)
-                </div>
-              </div>
-            )}
+            {/* Note: Theta control moved to live adjustment in Results Display */}
 
             {/* Reset to Smart Defaults */}
             <button

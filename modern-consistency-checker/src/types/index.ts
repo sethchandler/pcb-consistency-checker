@@ -94,6 +94,16 @@ export interface AnalysisResult {
 // Analysis emphasis type
 export type AnalysisEmphasis = 'avoid-false-negatives' | 'neutral' | 'avoid-false-positives';
 
+// Last analysis settings type for storing raw results context
+export interface LastAnalysisSettings {
+  numberOfPasses: number;
+  passStrategy: 'intersection' | 'union';
+  temperatureSettings: {
+    singlePass: number;
+    multiPass: number;
+  };
+}
+
 // Token usage interface
 export interface TokenUsage {
   promptTokens: number;
@@ -122,6 +132,8 @@ export interface ConsistencyStore {
     multiPass: number;
   };
   mergeTheta: number;
+  rawPassResults: string[];
+  lastAnalysisSettings: LastAnalysisSettings | null;
   
   // Actions
   setUploadedFiles: (files: UploadedFile[]) => void;
@@ -138,6 +150,9 @@ export interface ConsistencyStore {
   setCurrentProgress: (progress: string | null) => void;
   setTemperatureSettings: (settings: { singlePass: number; multiPass: number }) => void;
   setMergeTheta: (theta: number) => void;
+  setRawPassResults: (results: string[]) => void;
+  setLastAnalysisSettings: (settings: LastAnalysisSettings) => void;
+  clearRawPassResults: () => void;
   addToCost: (cost: number, tokens: number) => void;
   resetSessionCost: () => void;
   reset: () => void;

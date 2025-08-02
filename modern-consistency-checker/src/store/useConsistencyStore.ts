@@ -85,6 +85,8 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
     multiPass: 0.4     // Slightly lower for better consistency across passes
   },
   mergeTheta: 0.2,     // Default similarity threshold for TF-IDF merge
+  rawPassResults: [],  // Store individual pass results for live theta adjustment
+  lastAnalysisSettings: null, // Remember settings used for stored raw results
 
   // Actions
   setUploadedFiles: (files) => set({ uploadedFiles: files }),
@@ -117,6 +119,12 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
 
   setMergeTheta: (theta) => set({ mergeTheta: theta }),
 
+  setRawPassResults: (results) => set({ rawPassResults: results }),
+
+  setLastAnalysisSettings: (settings) => set({ lastAnalysisSettings: settings }),
+
+  clearRawPassResults: () => set({ rawPassResults: [], lastAnalysisSettings: null }),
+
   addToCost: (cost, tokens) => set((state) => ({
     sessionCost: state.sessionCost + cost,
     totalTokensUsed: state.totalTokensUsed + tokens,
@@ -133,6 +141,8 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
     analysisResults: null,
     isProcessing: false,
     error: null,
+    rawPassResults: [],
+    lastAnalysisSettings: null,
     // Note: We don't reset sessionCost here - only on app launch
   }),
 }))

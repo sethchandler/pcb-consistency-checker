@@ -156,7 +156,7 @@ export async function runMultiPassAnalysis(
   mergeTheta: number,
   onProgress: (stage: string, passNumber?: number, totalPasses?: number) => void,
   onCostUpdate: (cost: number, tokens: number) => void
-): Promise<{ content: string; totalCost: number; totalTokens: number; mergeReasoning?: MergeReasoning[] }> {
+): Promise<{ content: string; totalCost: number; totalTokens: number; mergeReasoning?: MergeReasoning[]; rawResults: string[] }> {
   
   // Explicit state initialization to prevent cross-run contamination
   let totalCost = 0;
@@ -194,7 +194,8 @@ export async function runMultiPassAnalysis(
       content: result.rawResponse || '',
       totalCost,
       totalTokens,
-      mergeReasoning: [] // No merge reasoning for single pass
+      mergeReasoning: [], // No merge reasoning for single pass
+      rawResults: [result.rawResponse || ''] // Single pass raw result
     };
   }
   
@@ -313,6 +314,7 @@ export async function runMultiPassAnalysis(
     content: finalContent,
     totalCost,
     totalTokens,
-    mergeReasoning: mergeReasoningArray
+    mergeReasoning: mergeReasoningArray,
+    rawResults: analysisResults // Return all individual pass results
   };
 }

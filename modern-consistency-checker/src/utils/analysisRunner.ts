@@ -18,7 +18,10 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
     setAnalysisResults,
     setError,
     setCurrentProgress,
-    addToCost
+    addToCost,
+    setRawPassResults,
+    setLastAnalysisSettings,
+    clearRawPassResults
   } = useConsistencyStore.getState();
 
   if (uploadedFiles.length === 0) {
@@ -105,6 +108,14 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
       }
     };
 
+    // Store raw results for live theta adjustment
+    setRawPassResults(result.rawResults);
+    setLastAnalysisSettings({
+      numberOfPasses,
+      passStrategy,
+      temperatureSettings
+    });
+
     setAnalysisResults(analysisResult);
     setCurrentProgress(null); // Clear progress when done
     
@@ -112,6 +123,7 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
     console.error('Analysis failed:', error);
     setError(error.message || 'Analysis failed');
     setCurrentProgress(null); // Clear progress on error
+    clearRawPassResults(); // Clear stale raw results on error
     throw error;
   }
 };
