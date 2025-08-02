@@ -1,15 +1,35 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText, X } from 'lucide-react';
+import { Upload, FileText, X, AlertTriangle } from 'lucide-react';
 import { useConsistencyStore } from '../store/useConsistencyStore';
 import { createUploadedFile } from '../utils/fileProcessing';
+import { validateMultipleFiles } from '../utils/fileValidation';
 
 const FileUpload: React.FC = () => {
   const { uploadedFiles, setUploadedFiles, setError } = useConsistencyStore();
   const [isDragging, setIsDragging] = useState(false);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = (files: FileList) => {
-    const newFiles = Array.from(files)
+    // First validate the files
+    const fileArray = Array.from(files);
+    const validation = validateMultipleFiles(fileArray);
+    
+    if (!validation.isValid) {
+      setError(`File validation failed: ${validation.errors.join('; ')}`);
+      setWarnings([]);
+      return;
+    }
+
+    // Show warnings if any
+    if (validation.warnings.length > 0) {
+      setWarnings(validation.warnings);
+    } else {
+      setWarnings([]);
+    }
+
+    // Process valid files
+    const newFiles = fileArray
       .map(file => createUploadedFile(file))
       .filter((file): file is NonNullable<typeof file> => file !== null);
 
@@ -83,6 +103,22 @@ const FileUpload: React.FC = () => {
           className="hidden"
         />
       </div>
+
+      {warnings.length > 0 && (
+        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="flex items-start">
+            <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" />
+            <div>
+              <h4 className="text-sm font-medium text-yellow-800">Warnings</h4>
+              <ul className="mt-1 text-sm text-yellow-700 list-disc list-inside">
+                {warnings.map((warning, index) => (
+                  <li key={index}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {uploadedFiles.length > 0 && (
         <div className="mt-4 space-y-2">

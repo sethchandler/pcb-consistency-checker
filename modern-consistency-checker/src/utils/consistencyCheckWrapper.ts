@@ -39,6 +39,8 @@ export async function analyzeConsistency(options: {
   apiKey: string;
   model?: string;
   outputFormat?: 'json' | 'markdown';
+  temperature?: number;
+  maxTokens?: number;
 }): Promise<ConsistencyCheckResult> {
   // Check if core function is loaded
   if (!window.consistencyCheckCore) {
