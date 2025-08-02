@@ -18,18 +18,14 @@ const ResultsDisplay: React.FC = () => {
   const [showReasoning, setShowReasoning] = useState(false);
   const [liveThetaValue, setLiveThetaValue] = useState(mergeTheta);
 
-  if (!analysisResults) {
-    return null;
-  }
-
   // Determine if we should show live theta controls and use live merging
   const shouldUseLiveMerging = rawPassResults.length > 1 && 
                                lastAnalysisSettings?.passStrategy === 'intersection';
 
   // Compute live merged content when theta changes
   const liveContent = useMemo(() => {
-    if (!shouldUseLiveMerging || rawPassResults.length < 2) {
-      return analysisResults.content; // Use stored content for single pass or union
+    if (!analysisResults || !shouldUseLiveMerging || rawPassResults.length < 2) {
+      return analysisResults?.content || ''; // Use stored content for single pass
     }
 
     // Perform progressive intersection merge with live theta
@@ -40,12 +36,16 @@ const ResultsDisplay: React.FC = () => {
     }
     
     return result;
-  }, [liveThetaValue, rawPassResults, shouldUseLiveMerging, analysisResults.content]);
+  }, [analysisResults, liveThetaValue, rawPassResults, shouldUseLiveMerging]);
 
   // Count matches for the current theta
   const currentMatchCount = useMemo(() => {
     return countInconsistencies(liveContent);
   }, [liveContent]);
+
+  if (!analysisResults) {
+    return null;
+  }
 
   const handleCopy = async () => {
     try {

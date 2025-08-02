@@ -146,7 +146,6 @@ export interface ConsistencyStore {
   setSelectedModel: (model: string) => void;
   setAnalysisEmphasis: (emphasis: AnalysisEmphasis) => void;
   setNumberOfPasses: (passes: 1 | 2 | 3) => void;
-  setPassStrategy: (strategy: 'intersection' | 'union') => void;
   setCurrentProgress: (progress: string | null) => void;
   setTemperatureSettings: (settings: { singlePass: number; multiPass: number }) => void;
   setMergeTheta: (theta: number) => void;

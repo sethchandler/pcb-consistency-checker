@@ -78,7 +78,7 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   sessionCost: 0,
   totalTokensUsed: 0,
   numberOfPasses: 1, // Default to single pass
-  passStrategy: 'union', // Default to return all found
+  passStrategy: 'intersection', // Always use intersection with theta culling
   currentProgress: null,
   temperatureSettings: {
     singlePass: 0.3,   // Conservative for consistent results
@@ -111,7 +111,6 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
 
   setNumberOfPasses: (passes) => set({ numberOfPasses: passes }),
 
-  setPassStrategy: (strategy) => set({ passStrategy: strategy }),
 
   setCurrentProgress: (progress) => set({ currentProgress: progress }),
 

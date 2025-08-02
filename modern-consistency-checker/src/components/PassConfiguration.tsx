@@ -5,35 +5,19 @@ import { useConsistencyStore } from '../store/useConsistencyStore';
 const PassConfiguration: React.FC = () => {
   const { 
     numberOfPasses, 
-    passStrategy, 
     temperatureSettings,
     setNumberOfPasses, 
-    setPassStrategy,
     setTemperatureSettings
   } = useConsistencyStore();
   
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Smart temperature defaults based on strategy
-  const getSmartDefaults = (strategy: 'union' | 'intersection') => {
-    if (strategy === 'union') {
-      return {
-        singlePass: 0.7,  // High creativity for finding diverse inconsistencies
-        multiPass: 0.8    // Even more diversity across passes
-      };
-    } else {
-      return {
-        singlePass: 0.3,  // Consistent baseline
-        multiPass: 0.2    // Very consistent for matching
-      };
-    }
-  };
-
-  // Apply smart defaults when strategy changes
-  const handleStrategyChange = (newStrategy: 'union' | 'intersection') => {
-    setPassStrategy(newStrategy);
-    const smartDefaults = getSmartDefaults(newStrategy);
-    setTemperatureSettings(smartDefaults);
+  // Smart temperature defaults - always use intersection strategy
+  const getSmartDefaults = () => {
+    return {
+      singlePass: 0.3,  // Consistent baseline
+      multiPass: 0.2    // Very consistent for matching
+    };
   };
 
   const passOptions = [
@@ -42,27 +26,10 @@ const PassConfiguration: React.FC = () => {
     { value: 3 as const, label: '3 Passes', description: 'Most thorough, ~3-5x time' }
   ];
 
-  const strategyOptions = [
-    { 
-      value: 'union' as const, 
-      label: 'Return All Found', 
-      description: 'Show inconsistencies found in ANY pass (comprehensive but likely to result in duplicated fixes)' 
-    },
-    { 
-      value: 'intersection' as const, 
-      label: 'Return Common Only', 
-      description: 'Show only inconsistencies found in ALL passes (avoids duplicate fixes but likely to be underinclusive)' 
-    }
-  ];
 
   const getTimingEstimate = () => {
     if (numberOfPasses === 1) return '';
-    
-    if (passStrategy === 'union') {
-      return numberOfPasses === 2 ? '~2x time' : '~3x time';
-    } else {
-      return numberOfPasses === 2 ? '~3x time' : '~5x time';
-    }
+    return numberOfPasses === 2 ? '~2x time' : '~3x time';
   };
 
   return (
@@ -114,43 +81,13 @@ const PassConfiguration: React.FC = () => {
         </div>
       </div>
 
-      {/* Strategy Selection (only show if multiple passes) */}
+      {/* Strategy info for multiple passes */}
       {numberOfPasses > 1 && (
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Result Strategy
-            <span className="ml-1 text-xs text-gray-500 group relative cursor-help">
-              <HelpCircle size={12} className="inline" />
-              <span className="invisible group-hover:visible absolute bottom-6 left-0 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
-                How to combine results from multiple passes
-              </span>
-            </span>
-          </label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {strategyOptions.map((option) => (
-              <label
-                key={option.value}
-                className={`
-                  relative cursor-pointer rounded-lg border-2 p-3 transition-all
-                  ${passStrategy === option.value 
-                    ? 'bg-green-50 border-green-300 text-green-800' 
-                    : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
-                  }
-                `}
-              >
-                <input
-                  type="radio"
-                  name="passStrategy"
-                  value={option.value}
-                  checked={passStrategy === option.value}
-                  onChange={(e) => handleStrategyChange(e.target.value as 'intersection' | 'union')}
-                  className="sr-only"
-                />
-                <div className="font-medium text-sm">{option.label}</div>
-                <div className="text-xs mt-1 opacity-75">{option.description}</div>
-              </label>
-            ))}
-          </div>
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <p className="text-sm text-blue-800">
+            <strong>📊 Multi-pass Strategy:</strong> All passes will be analyzed and merged using similarity threshold (θ) for optimal results. 
+            You can adjust the threshold after analysis to explore different merge levels.
+          </p>
         </div>
       )}
 
@@ -199,11 +136,7 @@ const PassConfiguration: React.FC = () => {
             </div>
 
             <div className="text-xs text-gray-600 mb-3">
-              <strong>Current Strategy Impact:</strong><br />
-              {passStrategy === 'union' 
-                ? 'Union (Return All): Higher temps for diverse, creative inconsistency detection'
-                : 'Intersection (Common Only): Lower temps for consistent, reliable consensus'
-              }
+              <strong>Current Strategy:</strong> Intersection with theta-based merging for consistent, reliable results
             </div>
 
             <p className="text-xs text-gray-600 mb-3">
@@ -265,10 +198,10 @@ const PassConfiguration: React.FC = () => {
 
             {/* Reset to Smart Defaults */}
             <button
-              onClick={() => setTemperatureSettings(getSmartDefaults(passStrategy))}
+              onClick={() => setTemperatureSettings(getSmartDefaults())}
               className="text-xs text-blue-600 hover:text-blue-800 underline"
             >
-              Reset to smart defaults for {passStrategy === 'union' ? 'Union' : 'Intersection'} strategy
+              Reset to smart defaults
             </button>
           </div>
         )}
