@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles for analysis content tables */
+.analysis-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 20px 0;
+}
+
+.analysis-content table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.analysis-content table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.analysis-content table th,
+.analysis-content table td {
+  padding: 12px;
+  text-align: left;
+  border: 1px solid #d1d5db;
+  vertical-align: top;
+}
+
+.analysis-content table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}

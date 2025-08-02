@@ -1,185 +1,360 @@
 # PCB Consistency Checker
 
-A standalone consistency analysis tool for PedagogicCaseBuilder case files. This tool extracts the AI-powered consistency checking functionality from the main PCB application into a separate, isolated environment to avoid React component issues.
+A web-based tool for analyzing legal case files and identifying factual inconsistencies across multiple documents. This tool uses AI to help ensure that witness statements, police reports, contracts, and other legal documents tell a consistent story.
 
-## Features
+## Table of Contents
 
-- 🔍 **AI-Powered Analysis**: Uses the same sophisticated legal consistency prompts as PCB
-- 📁 **PCB Export Compatible**: Reads JSON exports from PedagogicCaseBuilder (both full and student versions)
-- 📊 **Multiple Output Formats**: JSON, Markdown, and CSV export options
-- 🚀 **CLI Interface**: Easy command-line usage with comprehensive options
-- ✅ **Validation Tools**: Verify PCB export files before analysis
-- 🎯 **Isolated Environment**: No React components = no hook order issues
+- [For Users (Law Professors)](#for-users-law-professors)
+- [For Developers](#for-developers)
+- [For AI Assistants](#for-ai-assistants-claude-etc)
+- [Technical Architecture](#technical-architecture)
+- [Troubleshooting](#troubleshooting)
 
-## Installation
+---
 
-```bash
-cd pcb-consistency-checker
-npm install
+## For Users (Law Professors)
+
+### What This Tool Does
+
+The PCB Consistency Checker helps you find factual inconsistencies in case files - like when one witness says the accident happened at 3:00 PM but another says 3:30 PM, or when a police report describes a "blue sedan" but testimony mentions a "green SUV."
+
+### Getting Started
+
+1. **Open the Tool**: 
+   - Open the `index.html` file in your web browser (Chrome, Firefox, Safari, or Edge)
+   - No installation or server setup required!
+
+2. **Get an OpenAI API Key**:
+   - Visit [OpenAI's API page](https://platform.openai.com/api-keys)
+   - Create an account and generate an API key
+   - Keep this key private - it's like a password
+   - The tool will ask for this key when you first use it
+
+3. **Prepare Your Documents**:
+   - The tool accepts multiple file formats:
+     - **JSON files**: From PedagogicCaseBuilder exports
+     - **PDF files**: Standard PDF documents (text-based, not scanned images)
+     - **Text files**: Plain text (.txt) or Markdown (.md) files
+     - **Word documents**: Coming soon (currently shows placeholder)
+
+### How to Use
+
+1. **Upload Your Case Files**:
+   - Click "Choose Files" or drag and drop multiple documents onto the upload area
+   - You can upload witness statements, police reports, contracts, etc.
+
+2. **Enter Your API Key**:
+   - Paste your OpenAI API key in the secure field
+   - The key is only stored in your browser, never sent to any server
+
+3. **Preview Your Documents** (Optional):
+   - Click "Preview Processed Documents" to see what text was extracted
+   - Especially useful for PDFs to ensure content was read correctly
+   - Shows full document content in scrollable windows
+
+4. **Choose AI Model**:
+   - **GPT-4o Mini** (default): Fast and affordable, good for most cases
+   - **GPT-4o**: More expensive but better at complex analysis
+   - **GPT-3.5 Turbo**: Fastest and cheapest, but less accurate
+
+5. **Run the Analysis**:
+   - Click "Process & Analyze Documents"
+   - The AI will:
+     - Extract content from all files
+     - Identify document types (witness statement, contract, etc.)
+     - Find parties, dates, locations, and key facts
+     - Check for inconsistencies across all documents
+
+6. **Review Results**:
+   - See a summary of inconsistencies found
+   - Each inconsistency shows:
+     - Which documents conflict
+     - What the specific contradiction is
+     - Suggested fixes with exact text changes
+
+7. **Export Results**:
+   - **Export Markdown**: Human-readable report format
+   - **Export JSON**: Structured data for further processing
+
+### Understanding the Results
+
+The tool looks for objective factual conflicts:
+- ✅ **Will flag**: "Witness A says 3:00 PM, Witness B says 3:30 PM"
+- ❌ **Won't flag**: "CEO wants profits, advocate wants affordability" (different perspectives, not contradictions)
+
+### Customizing the Analysis
+
+The right panel shows the AI prompt. You can:
+- Edit it to focus on specific types of inconsistencies
+- Save your custom prompt to a file
+- Load different prompts for different case types
+
+### Cost Considerations
+
+Each analysis uses OpenAI's API, which charges per token (roughly per word):
+- **GPT-4o Mini**: About $0.01-0.05 per analysis (recommended)
+- **GPT-4o**: About $0.10-0.50 per analysis
+- **GPT-3.5 Turbo**: About $0.005-0.02 per analysis
+
+The tool shows token usage after each analysis.
+
+---
+
+## For Developers
+
+### Project Structure
+
+```
+pcb-consistency-checker/
+├── index.html                 # Main web interface
+├── consistency-checker.js     # Main application logic
+├── consistencyCheckCore.js    # Reusable core API function
+├── testConsistencyCore.html   # Test page for core function
+├── README.md                  # This file
+└── CLAUDE.md                  # AI assistant guide
 ```
 
-## Usage
+### Key Components
 
-### Basic Analysis
+#### 1. **consistencyCheckCore.js** - Reusable API Module
 
-```bash
-# Analyze a PCB export file
-node index.js check my-case-file.json --api-key sk-your-openai-key
+The heart of the application. A standalone function that can be integrated into any project:
 
-# Use environment variable for API key
-export OPENAI_API_KEY=sk-your-openai-key
-node index.js check my-case-file.json
+```javascript
+const result = await consistencyCheckCore.analyzeConsistency({
+    prompt: "Analysis instructions...",
+    content: "Document content to analyze...",
+    apiKey: "sk-...",
+    model: "gpt-4o-mini",
+    outputFormat: "json" // or "markdown"
+});
 ```
 
-### Output Options
+Features:
+- Standardized error codes (INVALID_API_KEY, RATE_LIMIT, etc.)
+- Consistent response structure for both success and failure
+- Token usage tracking
+- Works in both Node.js and browser environments
 
-```bash
-# Save results to file in different formats
-node index.js check case.json -o results.md --format markdown
-node index.js check case.json -o results.csv --format csv
-node index.js check case.json -o results.json --format json
+#### 2. **consistency-checker.js** - Web Application Logic
+
+Handles:
+- Multi-format file processing (JSON, PDF, TXT, MD, DOCX)
+- PDF text extraction using PDF.js
+- AI-powered document classification
+- Two-stage AI processing:
+  1. Classification: Identify document types and extract metadata
+  2. Analysis: Check for inconsistencies across all documents
+
+#### 3. **File Processing Pipeline**
+
+```
+User uploads files → Detect format → Extract content → 
+AI Classification → Structure enhancement → Consistency analysis
 ```
 
-### AI Model Options
+### Integration with Other Projects
 
-```bash
-# Use different OpenAI models and settings
-node index.js check case.json --model gpt-3.5-turbo --temperature 0.1
-node index.js check case.json --model gpt-4 --max-tokens 3000
+To use the consistency checker in another application:
+
+1. **Include the core function**:
+```html
+<script src="consistencyCheckCore.js"></script>
 ```
 
-### Validation and Testing
+2. **Prepare your content** (gather text from your app)
 
-```bash
-# Validate PCB export file format
-node index.js validate my-case-file.json
-
-# Test file parsing without AI analysis
-node index.js check case.json --dry-run
-```
-
-## Input Format
-
-The tool expects JSON files exported from PedagogicCaseBuilder with this structure:
-
-```json
-{
-  "caseFile": [
-    ["component-id", {
-      "id": "component-id",
-      "type": "GOALS|CASE|WITNESS|DOCUMENT",
-      "title": "Component Title",
-      "content": "Component content...",
-      "dependencies": [],
-      "status": "complete"
-    }]
-  ],
-  "exportedAt": "2025-01-31T...",
-  "version": "1.0",
-  "exportType": "full"
+3. **Call the function**:
+```javascript
+try {
+    const result = await consistencyCheckCore.analyzeConsistency({
+        prompt: customPrompt || DEFAULT_PROMPT,
+        content: structuredContent,
+        apiKey: userApiKey,
+        model: selectedModel,
+        outputFormat: 'json'
+    });
+    
+    if (result.success) {
+        // Handle result.data
+    } else {
+        // Handle errors using result.errorCode
+        switch (result.errorCode) {
+            case consistencyCheckCore.ERROR_CODES.INVALID_API_KEY:
+                // Show API key dialog
+                break;
+            case consistencyCheckCore.ERROR_CODES.RATE_LIMIT:
+                // Retry after delay
+                break;
+        }
+    }
+} catch (error) {
+    // Handle unexpected errors
 }
 ```
 
-## Output Formats
+### Adding New File Formats
 
-### JSON
-Complete analysis results with metadata, statistics, and structured inconsistency data.
+To support a new format (e.g., RTF):
 
-### Markdown  
-Human-readable report with summary and detailed inconsistency list.
+1. Update `detectFileType()` in consistency-checker.js
+2. Add extraction function:
+```javascript
+async function extractRTFContent(file) {
+    // Parse RTF and return:
+    return {
+        content: extractedText,
+        metadata: { documentType: 'rtf_document', ... },
+        structured: false
+    };
+}
+```
+3. Add case to `extractFileContent()` switch statement
 
-### CSV
-Spreadsheet-friendly format for further analysis or tracking.
+### API Error Codes
 
-## How It Works
+- `MISSING_PARAMS`: Required parameters missing
+- `INVALID_API_KEY`: 401 from OpenAI
+- `RATE_LIMIT`: 429 from OpenAI
+- `MODEL_NOT_FOUND`: Requested model not available
+- `QUOTA_EXCEEDED`: Billing/quota issues
+- `NETWORK_ERROR`: Connection problems
+- `PARSE_ERROR`: JSON parsing failed
+- `NO_RESPONSE`: Empty AI response
 
-1. **Parse PCB Export**: Converts JSON export back to internal Map format
-2. **Format Content**: Organizes case components by type (Goals, Case, Witness, Document)
-3. **AI Analysis**: Uses OpenAI with sophisticated legal consistency prompts
-4. **Parse Results**: Extracts inconsistencies from AI response table format
-5. **Export**: Formats results in requested output format
+---
 
-## AI Consistency Prompts
+## For AI Assistants (Claude, etc.)
 
-The tool uses the same detailed legal analysis prompts as PedagogicCaseBuilder:
+### Project Context
 
-- **Focuses on factual conflicts only** (dates, numbers, locations, names)
-- **Ignores different perspectives** and stakeholder disagreements  
-- **Provides specific fix recommendations** for each inconsistency
-- **Returns structured table format** for easy parsing
+This is a standalone web-based consistency checker that originated from debugging issues with React Error #310 in the PedagogicCaseBuilder project. After 6+ hours of debugging React hook violations, we created this separate tool using vanilla JavaScript to avoid React complexity.
 
-## Command Reference
+### Key Design Decisions
 
-### `check <file>`
-Analyze a PCB case file for inconsistencies.
+1. **Pure Client-Side**: No server required, runs entirely in browser
+2. **Vanilla JavaScript**: Avoided React/frameworks due to previous debugging nightmare
+3. **Two-Stage AI Processing**: 
+   - First: Classify documents and extract metadata
+   - Second: Analyze for inconsistencies
+4. **Modular Core Function**: `consistencyCheckCore.js` designed for reuse
 
-**Options:**
-- `-k, --api-key <key>` - OpenAI API key
-- `-o, --output <file>` - Output file path  
-- `-f, --format <format>` - Output format (json, markdown, csv)
-- `-m, --model <model>` - OpenAI model (default: gpt-4)
-- `--temperature <temp>` - AI temperature 0.0-1.0 (default: 0.3)
-- `--max-tokens <tokens>` - Maximum response tokens (default: 2000)
-- `--dry-run` - Parse file but skip AI analysis
+### Common Tasks
 
-**Exit Codes:**
-- `0` - Success (no inconsistencies found)
-- `1` - Issues found or analysis failed
+#### Adding Features
+- Check `consistency-checker.js` for the main pipeline
+- Use `consistencyCheckCore.js` for any OpenAI API calls
+- Maintain backward compatibility with PCB JSON exports
 
-### `validate <file>`
-Validate PCB export file format and show component breakdown.
+#### Debugging
+- Check browser console for errors
+- API errors return structured error codes
+- Preview button helps diagnose extraction issues
 
-## Examples
+#### Integration with PedagogicCaseBuilder
+The core function was specifically designed to be dropped into PCB:
+1. Import `consistencyCheckCore.js`
+2. Gather content from Zustand store components
+3. Format using existing `formatCaseFileForAnalysis()`
+4. Call core function and display results in modal
 
-```bash
-# Basic analysis with environment API key
-export OPENAI_API_KEY=sk-your-key
-node index.js check exported-case.json
+### Important Context from Development
 
-# Generate markdown report
-node index.js check case.json -o report.md --format markdown
+1. **React Error #310 History**: Original PCB integration failed due to React hook order violations. This standalone version avoids React entirely.
 
-# Quick validation
-node index.js validate suspicious-file.json
+2. **PDF Support**: Uses PDF.js for client-side extraction. Complex PDFs may need better parsing.
 
-# Conservative analysis with lower temperature
-node index.js check case.json --temperature 0.1 --model gpt-4
+3. **DOCX Placeholder**: Currently returns placeholder text. Would need docx.js or similar for real extraction.
+
+4. **Prompt Customization**: Users can edit prompts to focus on specific inconsistency types (dates, amounts, names, etc.)
+
+### File Processing Flow
+
+```javascript
+// 1. User uploads multiple files
+handleMultipleFileUpload(files)
+
+// 2. Extract content based on type
+extractFileContent(fileData) // Returns { content, metadata, structured }
+
+// 3. AI classification for unstructured docs
+classifyAndStructureDocuments(extractedFiles, apiKey)
+
+// 4. Format all documents
+formatStructuredDocuments(structuredDocuments)
+
+// 5. Run consistency analysis
+consistencyCheckCore.analyzeConsistency({...})
+
+// 6. Parse and display results
+parseConsistencyTable(markdownResponse)
 ```
 
-## Error Handling
+---
 
-The tool provides detailed error messages for:
-- Missing or invalid PCB export files
-- OpenAI API issues (rate limits, invalid keys, timeouts)
-- Empty case files or files with no content
-- Invalid command line arguments
+## Technical Architecture
 
-## Integration Back to PCB
+### Dependencies
 
-Once proven stable, this standalone checker could be:
-1. **Web Service**: Run as HTTP API for PCB to call
-2. **Child Process**: Spawned by PCB as separate Node.js process  
-3. **Code Integration**: Import functions back into PCB with better architecture
+- **PDF.js**: For client-side PDF text extraction
+- **OpenAI API**: For document analysis (requires API key)
+- No other external dependencies - pure vanilla JavaScript
 
-The isolation allows us to solve the consistency checking problem without React component complications.
+### Browser Compatibility
 
-## Development Status
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+
 
-- ✅ Core analysis engine extracted from PCB
-- ✅ CLI interface with full option support
-- ✅ Multiple output formats
-- ✅ Error handling and validation
-- 🔄 Testing with real PCB exports
-- 📋 Web interface option (optional)
+Requires modern JavaScript features:
+- async/await
+- Fetch API
+- ES6 modules
 
-## Why Standalone?
+### Security Considerations
 
-After 6+ hours debugging React Error #310 in the integrated PCB consistency checker, we decided to isolate the AI analysis functionality. This approach:
+- API keys stored only in browser memory
+- No server = no data persistence
+- All processing happens client-side
+- CORS may block local file:// usage (use http server if needed)
 
-- **Eliminates React hook order issues**
-- **Preserves all AI prompt engineering work**  
-- **Allows focused testing and debugging**
-- **Provides integration path back to PCB**
-- **Gives users immediate consistency checking capability**
+---
 
-Sometimes the best solution is strategic separation of concerns.
+## Troubleshooting
+
+### "No text found in PDF"
+- PDF might be scanned images rather than text
+- Try converting to text first using OCR software
+
+### "Invalid API key"
+- Check key starts with "sk-"
+- Ensure no extra spaces
+- Verify key is active on OpenAI dashboard
+
+### "Rate limit exceeded"
+- Wait a few minutes and try again
+- Consider upgrading OpenAI plan
+- Use GPT-3.5 Turbo for testing (higher limits)
+
+### Page won't load
+- Check browser console (F12) for errors
+- Ensure all files are in same directory
+- Try opening via web server instead of file://
+
+### Preview button disabled
+- Upload files first
+- Button enables once files are selected
+
+### High token usage
+- Reduce document size
+- Use GPT-4o Mini instead of GPT-4o
+- Upload fewer documents at once
+
+---
+
+## Version History
+
+- **v1.0**: Initial standalone version with multi-format support
+- Originated from PedagogicCaseBuilder consistency check feature
+- Built as vanilla JS to avoid React complexity issues
