@@ -5,6 +5,7 @@ import { resolve } from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/pcb-consistency-checker/',
   server: {
     hmr: {
       port: 5174,
