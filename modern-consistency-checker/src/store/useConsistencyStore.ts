@@ -77,6 +77,8 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   analysisEmphasis: 'avoid-false-negatives', // Default as requested
   sessionCost: 0,
   totalTokensUsed: 0,
+  numberOfPasses: 1, // Default to single pass
+  passStrategy: 'union', // Default to return all found
 
   // Actions
   setUploadedFiles: (files) => set({ uploadedFiles: files }),
@@ -98,6 +100,10 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   setSelectedModel: (model) => set({ selectedModel: model }),
 
   setAnalysisEmphasis: (emphasis) => set({ analysisEmphasis: emphasis }),
+
+  setNumberOfPasses: (passes) => set({ numberOfPasses: passes }),
+
+  setPassStrategy: (strategy) => set({ passStrategy: strategy }),
 
   addToCost: (cost, tokens) => set((state) => ({
     sessionCost: state.sessionCost + cost,

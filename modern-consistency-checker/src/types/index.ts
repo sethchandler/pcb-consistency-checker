@@ -97,6 +97,8 @@ export interface ConsistencyStore {
   analysisEmphasis: AnalysisEmphasis;
   sessionCost: number;
   totalTokensUsed: number;
+  numberOfPasses: 1 | 2 | 3;
+  passStrategy: 'intersection' | 'union';
   
   // Actions
   setUploadedFiles: (files: UploadedFile[]) => void;
@@ -108,6 +110,8 @@ export interface ConsistencyStore {
   setApiKey: (key: string) => void;
   setSelectedModel: (model: string) => void;
   setAnalysisEmphasis: (emphasis: AnalysisEmphasis) => void;
+  setNumberOfPasses: (passes: 1 | 2 | 3) => void;
+  setPassStrategy: (strategy: 'intersection' | 'union') => void;
   addToCost: (cost: number, tokens: number) => void;
   resetSessionCost: () => void;
   reset: () => void;

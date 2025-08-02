@@ -4,6 +4,7 @@ import FileUpload from './components/FileUpload';
 import ApiKeyInput from './components/ApiKeyInput';
 import PromptEditor from './components/PromptEditor';
 import AnalysisEmphasis from './components/AnalysisEmphasis';
+import PassConfiguration from './components/PassConfiguration';
 import AnalysisControl from './components/AnalysisControl';
 import ResultsDisplay from './components/ResultsDisplay';
 import ErrorDisplay from './components/ErrorDisplay';
@@ -44,6 +45,7 @@ function App() {
 
           {/* Right Column */}
           <div className="space-y-6">
+            <PassConfiguration />
             <PromptEditor />
           </div>
         </div>

@@ -1,8 +1,7 @@
 import { useConsistencyStore } from '../store/useConsistencyStore';
 import { extractFileContent } from './fileProcessing';
-import { analyzeConsistency } from './consistencyCheckWrapper';
 import { addEmphasisToPrompt } from './promptModifier';
-import { calculateCost } from './modelPricing';
+import { runMultiPassAnalysis } from './multiPassAnalysis';
 import type { ExtractedContent, AnalysisResult, TokenUsage } from '../types';
 
 export const runConsistencyAnalysis = async (): Promise<void> => {
@@ -12,6 +11,8 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
     selectedModel, 
     currentPrompt,
     analysisEmphasis,
+    numberOfPasses,
+    passStrategy,
     setAnalysisResults,
     setError,
     addToCost
@@ -54,41 +55,37 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
     // Step 3: Modify prompt based on emphasis setting  
     const modifiedPrompt = addEmphasisToPrompt(currentPrompt, analysisEmphasis);
     
-    // Step 4: Run consistency analysis
-    const analysisResult = await analyzeConsistency({
-      prompt: modifiedPrompt,
-      content: combinedContent,
-      apiKey: apiKey,
-      model: selectedModel,
-      outputFormat: 'markdown'
-    });
+    // Step 4: Run multi-pass or single-pass analysis
+    const result = await runMultiPassAnalysis(
+      modifiedPrompt,
+      combinedContent,
+      apiKey,
+      selectedModel,
+      numberOfPasses,
+      passStrategy,
+      (stage: string, passNumber?: number, totalPasses?: number) => {
+        // Progress updates - we could enhance this later with more detailed progress
+        console.log(passNumber && totalPasses ? `${stage} ${passNumber}/${totalPasses}` : stage);
+      },
+      (cost: number, tokens: number) => {
+        // Cost updates - add to session tracking immediately
+        addToCost(cost, tokens);
+      }
+    );
 
-    if (!analysisResult.success) {
-      throw new Error(analysisResult.error || 'Analysis failed');
-    }
-
-    // Step 5: Calculate cost and track usage
-    let cost = 0;
-    let totalTokens = 0;
+    // Step 5: Prepare token usage data for metadata
     let tokensUsed: TokenUsage | undefined;
-    
-    if (analysisResult.usage) {
+    if (result.totalTokens > 0) {
       tokensUsed = {
-        promptTokens: analysisResult.usage.promptTokens,
-        completionTokens: analysisResult.usage.completionTokens,
-        totalTokens: analysisResult.usage.totalTokens
+        promptTokens: 0, // We don't track individual prompt/completion splits in multi-pass
+        completionTokens: 0,
+        totalTokens: result.totalTokens
       };
-      
-      cost = calculateCost(selectedModel, tokensUsed);
-      totalTokens = tokensUsed.totalTokens;
-      
-      // Add to session cost tracking
-      addToCost(cost, totalTokens);
     }
 
     // Step 6: Create final result
-    const result: AnalysisResult = {
-      content: analysisResult.rawResponse || '',
+    const analysisResult: AnalysisResult = {
+      content: result.content,
       extractedContents,
       metadata: {
         model: selectedModel,
@@ -96,12 +93,12 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
         fileCount: uploadedFiles.length,
         totalCharacters: combinedContent.length,
         promptLength: currentPrompt.length,
-        cost,
+        cost: result.totalCost,
         tokensUsed
       }
     };
 
-    setAnalysisResults(result);
+    setAnalysisResults(analysisResult);
     
   } catch (error: any) {
     console.error('Analysis failed:', error);
