@@ -56,9 +56,26 @@ export interface Inconsistency {
   severity?: 'high' | 'medium' | 'low';
 }
 
+export interface MergeReasoning {
+  totalRowsA?: number;
+  totalRowsB?: number;
+  matchesFound?: number;
+  cacheBreakerId?: string;
+  approach?: string;
+  abstractionProcess?: Array<{
+    rowFromA: string;
+    abstractedIntent: string;
+    matchFoundInB: boolean;
+    matchingRowB?: string;
+    explanation: string;
+  }>;
+  finalDecision?: string;
+}
+
 export interface AnalysisResult {
   content: string; // The markdown/text analysis result
   extractedContents: ExtractedContent[];
+  mergeReasoning?: MergeReasoning[]; // Array of reasoning for each merge operation
   metadata: {
     model: string;
     timestamp: string;
@@ -100,6 +117,11 @@ export interface ConsistencyStore {
   numberOfPasses: 1 | 2 | 3;
   passStrategy: 'intersection' | 'union';
   currentProgress: string | null;
+  temperatureSettings: {
+    singlePass: number;
+    multiPass: number;
+    merge: number;
+  };
   
   // Actions
   setUploadedFiles: (files: UploadedFile[]) => void;
@@ -114,6 +136,7 @@ export interface ConsistencyStore {
   setNumberOfPasses: (passes: 1 | 2 | 3) => void;
   setPassStrategy: (strategy: 'intersection' | 'union') => void;
   setCurrentProgress: (progress: string | null) => void;
+  setTemperatureSettings: (settings: { singlePass: number; multiPass: number; merge: number }) => void;
   addToCost: (cost: number, tokens: number) => void;
   resetSessionCost: () => void;
   reset: () => void;

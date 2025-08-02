@@ -44,7 +44,7 @@ In the "Nature of Inconsistency" column, be extremely specific. Instead of gener
 
 Present your findings in a single Markdown table with these three columns:
 
-- **Sources of Conflict**: List the specific sources containing conflicting information
+- **Sources of Conflict**: List only the document names (e.g., "Hotel Receipt #4721", "Jane Doe's Testimony"). Do NOT include explanations or descriptions in this column.
 - **Nature of Inconsistency**: Provide an explicit description of exactly what conflicts (not just the topic)
 - **Recommended Fix**: Specify exactly which document/source should be modified, what specific text to change, what to change it to, and why that source was chosen for modification. Format as: "**[Document Name]**: Change '[current text]' to '[corrected text]' to match [authoritative source] because [reason]."
 
@@ -80,6 +80,11 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   numberOfPasses: 1, // Default to single pass
   passStrategy: 'union', // Default to return all found
   currentProgress: null,
+  temperatureSettings: {
+    singlePass: 0.3,   // Conservative for consistent results
+    multiPass: 0.5,    // Moderate for balanced creativity/consistency  
+    merge: 0.4         // Slightly conservative for reliable merging
+  },
 
   // Actions
   setUploadedFiles: (files) => set({ uploadedFiles: files }),
@@ -107,6 +112,8 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   setPassStrategy: (strategy) => set({ passStrategy: strategy }),
 
   setCurrentProgress: (progress) => set({ currentProgress: progress }),
+
+  setTemperatureSettings: (settings) => set({ temperatureSettings: settings }),
 
   addToCost: (cost, tokens) => set((state) => ({
     sessionCost: state.sessionCost + cost,

@@ -90,77 +90,109 @@ ANALYTICAL DIVERSITY MANDATE: Employ a distinctly different reasoning pattern fr
 /**
  * Merge two analysis results using intersection strategy
  */
+interface MergeReasoning {
+  totalRowsA?: number;
+  totalRowsB?: number;
+  matchesFound?: number;
+  cacheBreakerId?: string;
+  approach?: string;
+  abstractionProcess?: Array<{
+    rowFromA: string;
+    abstractedIntent: string;
+    matchFoundInB: boolean;
+    matchingRowB?: string;
+    explanation: string;
+  }>;
+  finalDecision?: string;
+}
+
 async function mergeIntersectionResults(
   resultA: string, 
   resultB: string,
   apiKey: string,
-  selectedModel: string
-): Promise<{ content: string; usage?: TokenUsage; cost: number }> {
-  // Debug logging
-  console.log('Merge inputs - Result A length:', resultA?.length, 'Result B length:', resultB?.length);
+  selectedModel: string,
+  temperature: number
+): Promise<{ content: string; reasoning?: MergeReasoning; usage?: TokenUsage; cost: number }> {
+  // Detailed debug logging for content analysis
+  console.log('\n=== MERGE OPERATION: HUMAN-READABLE ANALYSIS ===');
+  console.log('📊 INPUT A (Full Content):');
+  console.log(resultA);
+  console.log('\n📊 INPUT B (Full Content):');
+  console.log(resultB);
+  console.log('\n🔍 ANALYSIS: What should a human expect to find in common?');
+  console.log('Look at the tables above and mentally identify which inconsistencies');
+  console.log('describe the SAME underlying problem (even with different wording).');
+  console.log('=== END HUMAN ANALYSIS SECTION ===\n');
   
-  const mergeInstructions = `YOU ARE A TABLE INTERSECTION OPERATOR
+  // Generate cache-busting elements
+  const cacheBreaker = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  const analysisApproaches = [
+    'systematic cross-referencing methodology',
+    'forensic comparison analysis',
+    'semantic overlap detection',
+    'contextual similarity assessment',
+    'pattern-based matching analysis'
+  ];
+  const selectedApproach = analysisApproaches[Math.floor(Math.random() * analysisApproaches.length)];
+  
+  const mergeInstructions = `Your task is to find matching rows between two tables.
 
-Your task: Given two inconsistency tables, return ONLY rows that represent the SAME inconsistency (by meaning, not exact text).
+First, here are the two tables you must process:
 
-CRITICAL CONCEPT - Semantic Similarity:
-- You must perform r1 × r2 comparisons (where r1 = rows in table 1, r2 = rows in table 2)
-- Compare the MEANING of each inconsistency, not the exact wording
-- Two rows describe the SAME inconsistency if they identify the same factual conflict
-- Different wording of the same problem = SAME inconsistency
-- Different problems entirely = DIFFERENT inconsistencies
-
-INPUT FORMAT:
-Both tables have exactly 3 columns:
-| Sources of Conflict | Nature of Inconsistency | Recommended Fix |
-
-OUTPUT FORMAT:
-You MUST return a table with the EXACT SAME 3 columns:
-| Sources of Conflict | Nature of Inconsistency | Recommended Fix |
-
-INTERSECTION RULES:
-1. For each row in Table A, check if it semantically matches ANY row in Table B
-2. If a match exists, include it in output (use the clearer/more detailed version)
-3. If no match exists, exclude it
-4. NEVER create new columns or change the table structure
-
-EXAMPLE OF SEMANTIC MATCHING:
-
-Table A row:
-| 1. Police Report<br>2. Witness Statement | Date discrepancy: Report says Jan 15, witness says Jan 20 | **Police Report**: Change to Jan 20 |
-
-Table B row:
-| 1. Official Report<br>2. J. Smith Testimony | Event date conflict: January 20 per testimony vs January 15 in report | **Official Report**: Update date to match testimony |
-
-THESE ARE THE SAME (different words, same meaning) - Include ONE in output
-
-EXAMPLE OF NON-MATCHING:
-
-Table A row:
-| 1. Contract<br>2. Invoice | Payment terms: Net 30 vs Net 45 | **Invoice**: Correct to Net 30 |
-
-Table B row:
-| 1. Contract<br>2. Email | Duration: 6 months vs 12 months claimed | **Email**: Correct to 6 months |
-
-THESE ARE DIFFERENT (both involve contract but different issues) - Include NEITHER
-
-YOU ARE FORBIDDEN FROM:
-- Creating comparison columns like "Document 1" or "Analysis A"
-- Adding row numbers or item numbers
-- Creating any new table structure
-- Adding explanatory text above or below the table
-
-OUTPUT:
-Return ONLY the intersection table with the standard 3 columns.
-If no common inconsistencies exist, return:
-| Sources of Conflict | Nature of Inconsistency | Recommended Fix |
-|---|---|---|`;
-
-  const mergeContent = `ANALYSIS A:
+Table A:
 ${resultA}
 
-ANALYSIS B:
-${resultB}`;
+Table B:
+${resultB}
+
+**Your Goal and Rules:**
+
+1. **Primary Goal:** Create a new table containing only the rows from **Table A** that have a matching fix in **Table B**.
+2. **Matching Rule:** A match occurs ONLY if the text in the "Recommended Fix" column describes the exact same action for the same document. Be conservative: if the fixes are similar but not identical, they do not match.
+3. **Output Format:** Provide your output as a single JSON object. Analyze EVERY row from Table A in your reasoning. Do not use placeholder text; use the actual data from the tables.
+
+Here is the JSON structure to use. Fill it with your analysis.
+
+\`\`\`json
+{
+  "mergedTable": "| Sources of Conflict | Nature of Inconsistency | Recommended Fix |\\n|---|---|---|\\n[matching rows from Table A here, copied exactly]",
+  "reasoning": {
+    "totalRowsA": 0,
+    "totalRowsB": 0,
+    "matchesFound": 0,
+    "cacheBreakerId": "${cacheBreaker}",
+    "approach": "${selectedApproach}",
+    "abstractionProcess": [
+      {
+        "rowFromA": "complete row text from Table A",
+        "abstractedIntent": "what specific fix is prescribed",
+        "matchFoundInB": false,
+        "matchingRowB": "matching row text from Table B or null",
+        "explanation": "why these fixes match or don't match"
+      }
+    ],
+    "finalDecision": "Included X rows that had identical fixes in Table B"
+  }
+}
+\`\`\`
+
+Analysis ID: ${cacheBreaker}`;
+
+  // Content is required by the API, even though tables are in the prompt
+  const mergeContent = "Process the tables provided in the prompt above.";
+
+  // LOG THE EXACT PROMPT BEING SENT TO CHATGPT
+  console.log('\n🚨 === EXACT PROMPT SENT TO CHATGPT ===');
+  console.log('PROMPT:');
+  console.log('='.repeat(80));
+  console.log(mergeInstructions);
+  console.log('='.repeat(80));
+  console.log('CONTENT:');
+  console.log('='.repeat(80));
+  console.log(mergeContent);
+  console.log('='.repeat(80));
+  console.log('END OF EXACT PROMPT');
+  console.log('🚨 === END EXACT PROMPT ===\n');
 
   try {
     const result = await analyzeConsistency({
@@ -169,7 +201,7 @@ ${resultB}`;
       apiKey,
       model: selectedModel,
       outputFormat: 'markdown',
-      temperature: 0.7  // Moderate temperature for merge - want some creativity but still reliable
+      temperature: temperature
     });
 
     if (!result.success) {
@@ -188,8 +220,74 @@ ${resultB}`;
       cost = calculateCost(selectedModel, usage);
     }
 
+    const mergeOutput = result.rawResponse || '';
+    
+    // LOG THE EXACT RESPONSE FROM CHATGPT
+    console.log('\n🔥 === EXACT RESPONSE FROM CHATGPT ===');
+    console.log('RAW RESPONSE:');
+    console.log('='.repeat(80));
+    console.log(mergeOutput);
+    console.log('='.repeat(80));
+    console.log('END OF RAW RESPONSE');
+    console.log('🔥 === END EXACT RESPONSE ===\n');
+    
+    // Parse JSON response and extract table + reasoning
+    let finalTable = '';
+    let reasoning = null;
+    
+    try {
+      // Try to extract JSON from the response (might have markdown code blocks)
+      const jsonMatch = mergeOutput.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
+                       mergeOutput.match(/(\{[\s\S]*\})/);
+      
+      if (jsonMatch) {
+        const jsonResponse = JSON.parse(jsonMatch[1]);
+        finalTable = jsonResponse.mergedTable || '';
+        reasoning = jsonResponse.reasoning || null;
+        
+        console.log('\n✅ JSON PARSING SUCCESS');
+        console.log('📊 Extracted Table Length:', finalTable.length);
+        console.log('🧠 Reasoning Captured:', !!reasoning);
+        
+        if (reasoning) {
+          console.log('\n🔍 MERGE REASONING SUMMARY:');
+          console.log(`Total rows in A: ${reasoning.totalRowsA || 'unknown'}`);
+          console.log(`Total rows in B: ${reasoning.totalRowsB || 'unknown'}`);
+          console.log(`Matches found: ${reasoning.matchesFound || 'unknown'}`);
+          console.log(`Final decision: ${reasoning.finalDecision || 'none provided'}`);
+          
+          if (reasoning.abstractionProcess && reasoning.abstractionProcess.length > 0) {
+            console.log('\n🎯 ABSTRACTION PROCESS:');
+            reasoning.abstractionProcess.forEach((process: any, i: number) => {
+              console.log(`Row ${i + 1}: ${process.abstractedIntent}`);
+              console.log(`  Match found: ${process.matchFoundInB}`);
+              console.log(`  Explanation: ${process.explanation}`);
+            });
+          }
+        }
+      } else {
+        console.log('\n⚠️ JSON PARSING FAILED - Using raw response');
+        finalTable = mergeOutput;
+      }
+      
+    } catch (error: any) {
+      console.log('\n❌ JSON PARSE ERROR:', error?.message || 'Unknown error');
+      console.log('📝 Raw response:', mergeOutput);
+      finalTable = mergeOutput; // Fallback to raw response
+    }
+    
+    // Enhanced logging for human analysis
+    console.log('\n🤖 LLM MERGE DECISION:');
+    console.log('Raw Response Length:', mergeOutput.length);
+    console.log('Final Table Length:', finalTable.length);
+    console.log(`Approach used: ${selectedApproach}`);
+    console.log(`Temperature: ${temperature}`);
+    console.log(`Cache breaker: ${cacheBreaker}`);
+    console.log('\n=== END MERGE ANALYSIS ===\n');
+
     return {
-      content: result.rawResponse || '',
+      content: finalTable,
+      reasoning: reasoning, // Include reasoning in return for potential UI use
       usage,
       cost
     };
@@ -242,13 +340,15 @@ export async function runMultiPassAnalysis(
   selectedModel: string,
   numberOfPasses: number,
   strategy: 'intersection' | 'union',
+  temperatureSettings: { singlePass: number; multiPass: number; merge: number },
   onProgress: (stage: string, passNumber?: number, totalPasses?: number) => void,
   onCostUpdate: (cost: number, tokens: number) => void
-): Promise<{ content: string; totalCost: number; totalTokens: number }> {
+): Promise<{ content: string; totalCost: number; totalTokens: number; mergeReasoning?: MergeReasoning[] }> {
   
   // Explicit state initialization to prevent cross-run contamination
   let totalCost = 0;
   let totalTokens = 0;
+  const mergeReasoningArray: MergeReasoning[] = [];
   const runId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
   
   console.log(`Starting multi-pass analysis run ${runId} with ${numberOfPasses} passes using ${strategy} strategy`);
@@ -263,7 +363,7 @@ export async function runMultiPassAnalysis(
       apiKey,
       model: selectedModel,
       outputFormat: 'markdown',
-      temperature: 0.3  // Lower temperature for single-pass - want consistent, reliable results
+      temperature: temperatureSettings.singlePass
     });
     
     if (!result.success) {
@@ -280,7 +380,8 @@ export async function runMultiPassAnalysis(
     return {
       content: result.rawResponse || '',
       totalCost,
-      totalTokens
+      totalTokens,
+      mergeReasoning: [] // No merge reasoning for single pass
     };
   }
   
@@ -298,14 +399,14 @@ export async function runMultiPassAnalysis(
     
     console.log(`Run ${runId}: Pass ${pass} prompt prefix length: ${randomPrefix.length}`);
     
-    // Run the analysis for this pass with higher temperature for variability
+    // Run the analysis for this pass with configurable temperature
     const result = await analyzeConsistency({
       prompt: randomizedPrompt,
       content,
       apiKey,
       model: selectedModel,
       outputFormat: 'markdown',
-      temperature: 0.8  // Higher temperature for multi-pass to ensure varied outputs
+      temperature: temperatureSettings.multiPass
     });
     
     if (!result.success) {
@@ -325,6 +426,12 @@ export async function runMultiPassAnalysis(
     analysisResults.push(passResult);
     
     console.log(`Run ${runId}: Pass ${pass} completed - result length: ${passResult.length}`);
+    
+    // Human-readable logging of individual pass results
+    console.log(`\n=== PASS ${pass} DETAILED RESULTS ===`);
+    console.log('FULL RESULT:');
+    console.log(passResult);
+    console.log(`=== END PASS ${pass} ===\n`);
     
     // For intersection strategy, merge progressively
     if (strategy === 'intersection' && analysisResults.length >= 2) {
@@ -351,12 +458,18 @@ export async function runMultiPassAnalysis(
           previousResult,
           currentResult,
           apiKey,
-          selectedModel
+          selectedModel,
+          temperatureSettings.merge
         );
         
         // Clean the merged content to ensure it's just the table
         mergedResult = cleanTableContent(merged.content);
         console.log(`Run ${runId}: Merge completed - result length: ${mergedResult.length}`);
+        
+        // Store reasoning for UI display
+        if (merged.reasoning) {
+          mergeReasoningArray.push(merged.reasoning);
+        }
         
         totalCost += merged.cost;
         if (merged.usage) {
@@ -391,6 +504,7 @@ export async function runMultiPassAnalysis(
   return {
     content: finalContent,
     totalCost,
-    totalTokens
+    totalTokens,
+    mergeReasoning: mergeReasoningArray
   };
 }

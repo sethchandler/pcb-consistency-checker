@@ -1,14 +1,18 @@
-import React from 'react';
-import { RotateCcw, HelpCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { RotateCcw, HelpCircle, ChevronDown, ChevronRight, Settings } from 'lucide-react';
 import { useConsistencyStore } from '../store/useConsistencyStore';
 
 const PassConfiguration: React.FC = () => {
   const { 
     numberOfPasses, 
     passStrategy, 
+    temperatureSettings,
     setNumberOfPasses, 
-    setPassStrategy 
+    setPassStrategy,
+    setTemperatureSettings
   } = useConsistencyStore();
+  
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const passOptions = [
     { value: 1 as const, label: '1 Pass', description: 'Standard single analysis' },
@@ -137,6 +141,126 @@ const PassConfiguration: React.FC = () => {
           </p>
         </div>
       )}
+
+      {/* Advanced Temperature Controls */}
+      <div className="mt-4 border-t border-gray-200 pt-4">
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors w-full"
+        >
+          {showAdvanced ? (
+            <ChevronDown className="mr-2" size={16} />
+          ) : (
+            <ChevronRight className="mr-2" size={16} />
+          )}
+          <Settings className="mr-2" size={16} />
+          Advanced Temperature Settings
+          <span className="ml-1 text-xs text-gray-500 group relative cursor-help">
+            <HelpCircle size={12} className="inline" />
+            <span className="invisible group-hover:visible absolute bottom-6 left-0 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+              Control AI creativity vs consistency
+            </span>
+          </span>
+        </button>
+
+        {showAdvanced && (
+          <div className="mt-4 space-y-4 bg-gray-50 rounded-lg p-4">
+            <p className="text-xs text-gray-600 mb-3">
+              Lower values (0.0-0.3) = More consistent, focused results<br />
+              Higher values (0.7-1.0) = More creative, varied results
+            </p>
+
+            {/* Single Pass Temperature */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Single Pass Temperature: {temperatureSettings.singlePass.toFixed(1)}
+                <span className="ml-1 text-xs text-gray-500 group relative cursor-help">
+                  <HelpCircle size={12} className="inline" />
+                  <span className="invisible group-hover:visible absolute bottom-6 left-0 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+                    Temperature for single-pass analysis
+                  </span>
+                </span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={temperatureSettings.singlePass}
+                onChange={(e) => setTemperatureSettings({
+                  ...temperatureSettings,
+                  singlePass: parseFloat(e.target.value)
+                })}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+
+            {/* Multi Pass Temperature */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Multi Pass Temperature: {temperatureSettings.multiPass.toFixed(1)}
+                <span className="ml-1 text-xs text-gray-500 group relative cursor-help">
+                  <HelpCircle size={12} className="inline" />
+                  <span className="invisible group-hover:visible absolute bottom-6 left-0 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+                    Temperature for each individual pass in multi-pass analysis
+                  </span>
+                </span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={temperatureSettings.multiPass}
+                onChange={(e) => setTemperatureSettings({
+                  ...temperatureSettings,
+                  multiPass: parseFloat(e.target.value)
+                })}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+
+            {/* Merge Temperature */}
+            {numberOfPasses > 1 && passStrategy === 'intersection' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Merge Temperature: {temperatureSettings.merge.toFixed(1)}
+                  <span className="ml-1 text-xs text-gray-500 group relative cursor-help">
+                    <HelpCircle size={12} className="inline" />
+                    <span className="invisible group-hover:visible absolute bottom-6 left-0 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+                      Temperature for merging results in intersection strategy
+                    </span>
+                  </span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={temperatureSettings.merge}
+                  onChange={(e) => setTemperatureSettings({
+                    ...temperatureSettings,
+                    merge: parseFloat(e.target.value)
+                  })}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+            )}
+
+            {/* Reset to Defaults */}
+            <button
+              onClick={() => setTemperatureSettings({
+                singlePass: 0.3,
+                multiPass: 0.5,
+                merge: 0.4
+              })}
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              Reset to defaults
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

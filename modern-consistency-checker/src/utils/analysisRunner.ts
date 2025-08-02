@@ -13,6 +13,7 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
     analysisEmphasis,
     numberOfPasses,
     passStrategy,
+    temperatureSettings,
     setAnalysisResults,
     setError,
     setCurrentProgress,
@@ -64,6 +65,7 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
       selectedModel,
       numberOfPasses,
       passStrategy,
+      temperatureSettings,
       (stage: string, passNumber?: number, totalPasses?: number) => {
         // Progress updates - display in UI instead of console
         const progressMessage = passNumber && totalPasses ? `${stage} ${passNumber}/${totalPasses}` : stage;
@@ -89,6 +91,7 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
     const analysisResult: AnalysisResult = {
       content: result.content,
       extractedContents,
+      mergeReasoning: result.mergeReasoning, // Include merge reasoning for UI
       metadata: {
         model: selectedModel,
         timestamp: new Date().toISOString(),

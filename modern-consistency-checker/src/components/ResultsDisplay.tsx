@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Clock, Users, Download, Copy, Check, ChevronDown } from 'lucide-react';
+import { FileText, Clock, Users, Download, Copy, Check, ChevronDown, Brain } from 'lucide-react';
 import { marked } from 'marked';
 import { useConsistencyStore } from '../store/useConsistencyStore';
 import { addTableNumbering, countInconsistencies } from '../utils/tableNumbering';
@@ -8,6 +8,7 @@ const ResultsDisplay: React.FC = () => {
   const { analysisResults, uploadedFiles } = useConsistencyStore();
   const [copied, setCopied] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+  const [showReasoning, setShowReasoning] = useState(false);
 
   if (!analysisResults) {
     return null;
@@ -93,6 +94,22 @@ const ResultsDisplay: React.FC = () => {
           Consistency Analysis Results
         </h2>
         <div className="flex items-center space-x-2">
+          {/* Reasoning Toggle Button - only show if merge reasoning exists */}
+          {analysisResults.mergeReasoning && analysisResults.mergeReasoning.length > 0 && (
+            <button
+              onClick={() => setShowReasoning(!showReasoning)}
+              className={`flex items-center px-3 py-2 rounded transition-colors ${
+                showReasoning 
+                  ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' 
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+              }`}
+              title="Show Merge Reasoning"
+            >
+              <Brain className="mr-1" size={16} />
+              {showReasoning ? 'Hide' : 'Show'} Reasoning
+            </button>
+          )}
+          
           <button
             onClick={handleCopy}
             className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
@@ -218,6 +235,93 @@ const ResultsDisplay: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Merge Reasoning Display */}
+      {showReasoning && analysisResults.mergeReasoning && analysisResults.mergeReasoning.length > 0 && (
+        <div className="mt-6 border border-purple-200 rounded-lg bg-purple-50">
+          <div className="bg-purple-100 px-4 py-3 border-b border-purple-200">
+            <h3 className="text-lg font-medium text-purple-800 flex items-center">
+              <Brain className="mr-2" size={20} />
+              Merge Reasoning Analysis
+            </h3>
+            <p className="text-sm text-purple-600 mt-1">
+              Step-by-step reasoning for how the intersection merge was performed
+            </p>
+          </div>
+          <div className="p-6 space-y-6">
+            {analysisResults.mergeReasoning.map((reasoning, mergeIndex) => (
+              <div key={mergeIndex} className="bg-white rounded-lg p-4 border border-purple-200">
+                <div className="mb-4">
+                  <h4 className="text-md font-semibold text-purple-800 mb-2">
+                    Merge Operation #{mergeIndex + 1}
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-700">Rows in Table A:</span>
+                      <span className="ml-2 text-gray-600">{reasoning.totalRowsA || 'Unknown'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">Rows in Table B:</span>
+                      <span className="ml-2 text-gray-600">{reasoning.totalRowsB || 'Unknown'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">Matches Found:</span>
+                      <span className="ml-2 text-green-600 font-medium">{reasoning.matchesFound || 0}</span>
+                    </div>
+                  </div>
+                  {reasoning.approach && (
+                    <div className="mt-2 text-sm">
+                      <span className="font-medium text-gray-700">Analysis Approach:</span>
+                      <span className="ml-2 text-gray-600">{reasoning.approach}</span>
+                    </div>
+                  )}
+                </div>
+
+                {reasoning.abstractionProcess && reasoning.abstractionProcess.length > 0 && (
+                  <div className="space-y-3">
+                    <h5 className="font-medium text-gray-800">Row-by-Row Analysis:</h5>
+                    {reasoning.abstractionProcess.map((process, processIndex) => (
+                      <div key={processIndex} className="border-l-4 border-purple-300 pl-4 py-2 bg-gray-50 rounded-r">
+                        <div className="text-sm">
+                          <div className="font-medium text-gray-800 mb-1">
+                            Row {processIndex + 1}: {process.abstractedIntent}
+                          </div>
+                          <div className="text-gray-600 mb-2 text-xs">
+                            "{process.rowFromA}"
+                          </div>
+                          <div className={`flex items-center text-sm ${
+                            process.matchFoundInB ? 'text-green-700' : 'text-orange-700'
+                          }`}>
+                            <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                              process.matchFoundInB ? 'bg-green-500' : 'bg-orange-500'
+                            }`}></span>
+                            {process.matchFoundInB ? 'Match Found' : 'No Match'}
+                          </div>
+                          {process.matchingRowB && (
+                            <div className="text-xs text-gray-500 mt-1 italic">
+                              Matched with: "{process.matchingRowB}"
+                            </div>
+                          )}
+                          <div className="text-xs text-gray-600 mt-1">
+                            <strong>Explanation:</strong> {process.explanation}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {reasoning.finalDecision && (
+                  <div className="mt-4 p-3 bg-purple-100 rounded border-l-4 border-purple-400">
+                    <h5 className="font-medium text-purple-800 mb-1">Final Decision:</h5>
+                    <p className="text-sm text-purple-700">{reasoning.finalDecision}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
