@@ -1,8 +1,19 @@
-# PCB Consistency Checker - AI Assistant Guide
+# PCB Consistency Checker - Complete Development Guide
 
-## Quick Context
+## Overview
 
-This is a standalone web app that checks legal documents for factual inconsistencies. Born from a 6+ hour React debugging nightmare (Error #310) in PedagogicCaseBuilder, we built this with vanilla JS to avoid React complexity.
+A sophisticated AI-powered web application for analyzing legal documents and identifying factual inconsistencies. This project evolved from a vanilla JavaScript proof-of-concept to a modern React application with advanced multi-pass analysis capabilities.
+
+**🌟 Live Application**: https://sethchandler.github.io/pcb-consistency-checker/
+
+## Quick Context & Evolution
+
+This project has two major versions:
+
+1. **Original Vanilla JS Version** (root directory) - Simple, reliable, born from React Error #310 trauma
+2. **Modern React Version** (`modern-consistency-checker/`) - Advanced features, multi-pass analysis, production deployment
+
+The modern version is the primary application with sophisticated capabilities built through extensive development and debugging sessions.
 
 ## What You Need to Know
 
@@ -197,6 +208,243 @@ No complex state! Just:
 5. **Cache results** - Avoid re-processing same docs
 6. **Export templates** - Custom report formats
 
-### Remember
+---
 
-This tool was born from frustration with React complexity. Keep it simple. If someone suggests "let's rewrite this in React," remind them of the 6+ hour debugging session that led to this clean, working solution.
+# Modern React Version - Advanced Features & Development History
+
+## How to Use the Modern Application
+
+### Basic Workflow
+1. **Upload Documents**: Drag and drop PDF, JSON, text, or markdown files
+2. **Configure API**: Enter your OpenAI API key and select a model (gpt-4o-mini recommended)
+3. **Set Analysis Parameters**:
+   - Number of passes (1, 2, or 3)
+   - Strategy: Union (find all) vs Intersection (find common only)
+   - Temperature controls for creativity vs consistency
+   - Emphasis: avoid false positives vs false negatives
+4. **Run Analysis**: Click "Run Analysis" and monitor progress
+5. **Review Results**: View inconsistencies in a formatted table with reasoning
+6. **Export**: Download results as Markdown, JSON, or HTML
+
+### Key Advanced Features
+- **Multi-pass Analysis**: Run multiple independent analyses and merge results
+- **Strategy Selection**: 
+  - Union: Combines all findings from multiple passes
+  - Intersection: Only keeps inconsistencies found in multiple passes
+- **Temperature Controls**: Fine-tune AI creativity vs consistency for each stage
+- **Cost Tracking**: Real-time cost calculation with 5-decimal precision
+- **Merge Reasoning**: View step-by-step analysis of how intersection merges work
+- **Table Numbering**: Automatically numbers inconsistencies for easy reference
+
+### Advanced Configuration
+- **Temperature Settings**:
+  - Single Pass: Controls creativity for single-pass analysis
+  - Multi Pass: Controls variation between multiple passes
+  - Merge: Controls consistency when merging results
+- **Smart Defaults**: Automatically optimizes temperatures based on strategy
+- **Progress Tracking**: Real-time updates during analysis
+
+## Major Development Challenges & Solutions
+
+### 1. Multi-Pass Determinism Issue (The 398 Character Problem)
+**Problem**: Multiple analysis passes with identical inputs were producing identical outputs despite different prompts.
+
+**Root Cause**: OpenAI API was caching responses for similar requests.
+
+**Solution**: Implemented cache-busting with:
+- Unique timestamps and random seeds in prompts
+- Varied analytical approaches per pass
+- Temperature adjustments
+- Randomized prompt prefixes with different focus areas
+
+**What Worked**: Adding substantial variation to prompts with randomized analytical approaches.
+
+### 2. Merge Logic Catastrophic Failure
+**Problem**: LLM merge operations were producing generic, abstracted outputs instead of preserving original content.
+
+**Critical User Feedback**: 
+- "Unfortunately something is still going wrong in the merge stage"
+- "That seems like subpar performance from you" 
+- "I have lost trust"
+
+**Failed Approaches**:
+- Complex instruction sets with examples
+- Verbose prompts with detailed explanations
+- JSON response formats with nested reasoning
+
+**Breakthrough Solution**: Adopted Gemini's "data-first" approach:
+- Put data tables first in the prompt
+- Simplified language and removed examples
+- Clear, concise instructions
+- Focus on exact text matching rather than semantic abstraction
+
+**What Worked**: Gemini's prompt engineering approach - simplicity over complexity.
+
+### 3. Server Stability Issues
+**Problem**: Development server crashes during PDF processing and long-running analyses.
+
+**Solution**: Switched to production builds with `nohup npm run preview` for stability.
+
+**Created**: `STABLE-SERVER-GUIDE.md` with deployment best practices.
+
+### 4. PDF.js Integration Nightmare
+**Problem**: CORS errors and ES module conflicts when importing PDF.js.
+
+**User Feedback**: "No you are tunnel visioning, which is your worst trait"
+
+**Failed Approach**: Trying to use ES modules and complex import configurations.
+
+**Solution**: Reverted to simple script tags in HTML - sometimes the simplest approach works best.
+
+### 5. Empty Intersection Tables
+**Problem**: Even with low temperatures, intersection strategy was producing empty result tables.
+
+**Solution**: Implemented semantic abstraction protocol with strict "preserve original text" instructions.
+
+**What Worked**: JSON response format with detailed reasoning capture for debugging merge operations.
+
+## GitHub Pages Deployment Success
+
+### Authentication Challenge
+**Problem**: Previous experience showed GitHub CLI conflicts and token permission issues.
+
+**Solution**: 
+- Used Classic Personal Access Token with repo scope
+- Avoided GitHub CLI for authentication
+- Set up proper workflow permissions
+
+### Subdirectory Deployment
+**Problem**: Vite app was in `modern-consistency-checker/` subdirectory, not root.
+
+**Solution**:
+- Configured `vite.config.ts` with `base: '/pcb-consistency-checker/'`
+- Updated GitHub Actions workflow to build from subdirectory
+- Set GitHub Pages source to "GitHub Actions"
+
+**Result**: ✅ Perfect deployment success on first retry after Pages configuration.
+
+## What Worked vs What Didn't
+
+### ✅ What Worked Well
+
+1. **Modern Tech Stack**: Vite + React + TypeScript + Zustand proved reliable and fast
+2. **Progressive Development**: Building features incrementally with user feedback
+3. **Comprehensive Error Handling**: Error boundaries and file validation prevented crashes
+4. **Strategy-Aware Defaults**: Smart temperature defaults optimized for each strategy's goals
+5. **Debugging Infrastructure**: Extensive logging and reasoning capture for troubleshooting
+6. **Cost Transparency**: Real-time cost tracking builds user trust
+7. **Gemini's Prompt Engineering**: Data-first, simple instructions
+8. **Production Builds**: Much more stable than development servers
+
+### ❌ What Didn't Work
+
+1. **Complex Prompt Engineering**: Over-detailed instructions often confused the LLM
+2. **ES Module Imports for PDF.js**: Script tags were more reliable
+3. **Development Server for Production**: Production builds required for stability
+4. **Semantic Abstraction**: LLMs tend to abstract rather than preserve exact text
+5. **Cache Assumptions**: OpenAI API caching behavior was initially underestimated
+6. **Verbose Merge Instructions**: Simplicity beat complexity
+
+## Key Lessons Learned
+
+### Prompt Engineering
+- **Data first, instructions second** (from Gemini's approach)
+- **Simplicity beats complexity** in LLM instructions
+- **Cache-busting is essential** for varied outputs
+- **Temperature control is crucial** for different use cases
+
+### React Development
+- **Error boundaries are essential** for AI-powered apps
+- **Progressive enhancement** works better than big-bang features
+- **User feedback is invaluable** for UX improvements
+- **Production builds** for anything beyond basic development
+
+### AI Integration
+- **Cost transparency** builds user confidence
+- **Reasoning capture** enables debugging and trust
+- **Multiple strategies** give users control over precision vs recall
+- **Real-time progress updates** improve perceived performance
+
+## Future Enhancements
+
+### Planned Features
+1. **TF-IDF JavaScript Merge**: Replace LLM-based merging with semantic similarity using cosine distance (proof-of-concept already built by Gemini)
+2. **Advanced File Support**: DOCX, Excel, and other document formats
+3. **Batch Processing**: Multiple case analysis in parallel
+4. **Export Templates**: Customizable report formats
+5. **Comparison Mode**: Side-by-side document analysis
+
+### Technical Improvements
+- Implement fuzzy semi-join for intersection merging
+- Add document preprocessing and cleaning
+- Improve mobile responsiveness
+- Add keyboard shortcuts for power users
+
+## Development Commands
+
+```bash
+# Navigate to modern version
+cd modern-consistency-checker/
+
+# Install dependencies
+npm install
+
+# Development server (use for basic testing only)
+npm run dev
+
+# Production build (recommended for stability)
+npm run build && npm run preview
+
+# Stable server (for intensive testing)
+nohup npm run preview &
+
+# Deploy to GitHub Pages (automatic on push to master)
+git push origin master
+```
+
+## Repository Structure
+```
+pcb-consistency-checker/
+├── modern-consistency-checker/     # Main React application
+│   ├── src/
+│   │   ├── components/            # React components
+│   │   ├── store/                 # Zustand state management
+│   │   ├── types/                 # TypeScript definitions
+│   │   └── utils/                 # Core analysis logic
+│   ├── public/                    # Static assets
+│   └── dist/                      # Production build output
+├── .github/workflows/             # GitHub Actions deployment
+├── consistency-checker.js         # Original vanilla JS version
+├── index.html                     # Original simple UI
+└── CLAUDE.md                      # This development guide
+```
+
+## Architecture: Two Worlds
+
+### Original Vanilla JS (Root Directory)
+- Born from React Error #310 trauma
+- Simple, reliable, client-side only
+- Perfect for basic consistency checking
+- Uses `consistencyCheckCore.js` for reusable functionality
+
+### Modern React Application (modern-consistency-checker/)
+- Advanced multi-pass analysis capabilities
+- Professional UI with comprehensive error handling
+- Real-time cost tracking and progress updates
+- Production deployment with GitHub Pages
+- Sophisticated state management with Zustand
+
+## Remember: The Journey
+
+This project represents a complete evolution from simple vanilla JavaScript to a sophisticated React application. The key insight is that **both approaches have value**:
+
+- **Vanilla JS**: Simple, reliable, no build process
+- **Modern React**: Advanced features, professional deployment, comprehensive error handling
+
+The development process taught us that the best solutions often come from:
+1. **User feedback** over assumptions
+2. **Simplicity** over complexity (especially in prompts)
+3. **Progressive enhancement** over big-bang features
+4. **Production thinking** from day one
+
+*When Gemini's simple prompt engineering approach solved our most challenging merge logic problem, it reminded us that sometimes the best solutions are the simplest ones.*

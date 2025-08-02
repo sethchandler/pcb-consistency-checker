@@ -7,9 +7,11 @@ const PassConfiguration: React.FC = () => {
     numberOfPasses, 
     passStrategy, 
     temperatureSettings,
+    mergeTheta,
     setNumberOfPasses, 
     setPassStrategy,
-    setTemperatureSettings
+    setTemperatureSettings,
+    setMergeTheta
   } = useConsistencyStore();
   
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -19,14 +21,12 @@ const PassConfiguration: React.FC = () => {
     if (strategy === 'union') {
       return {
         singlePass: 0.7,  // High creativity for finding diverse inconsistencies
-        multiPass: 0.8,   // Even more diversity across passes
-        merge: 0.4        // Not used in union, but reasonable default
+        multiPass: 0.8    // Even more diversity across passes
       };
     } else {
       return {
         singlePass: 0.3,  // Consistent baseline
-        multiPass: 0.2,   // Very consistent for matching
-        merge: 0.1        // Ultra-consistent for reliable merging
+        multiPass: 0.2    // Very consistent for matching
       };
     }
   };
@@ -263,15 +263,15 @@ const PassConfiguration: React.FC = () => {
               />
             </div>
 
-            {/* Merge Temperature */}
+            {/* Merge Theta (Similarity Threshold) */}
             {numberOfPasses > 1 && passStrategy === 'intersection' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Merge Temperature: {temperatureSettings.merge.toFixed(1)}
+                  Merge Similarity Threshold (θ): {mergeTheta.toFixed(2)}
                   <span className="ml-1 text-xs text-gray-500 group relative cursor-help">
                     <HelpCircle size={12} className="inline" />
                     <span className="invisible group-hover:visible absolute bottom-6 left-0 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
-                      Temperature for merging results in intersection strategy
+                      TF-IDF similarity threshold for matching fixes (0=lenient, 1=exact)
                     </span>
                   </span>
                 </label>
@@ -279,14 +279,15 @@ const PassConfiguration: React.FC = () => {
                   type="range"
                   min="0"
                   max="1"
-                  step="0.1"
-                  value={temperatureSettings.merge}
-                  onChange={(e) => setTemperatureSettings({
-                    ...temperatureSettings,
-                    merge: parseFloat(e.target.value)
-                  })}
+                  step="0.05"
+                  value={mergeTheta}
+                  onChange={(e) => setMergeTheta(parseFloat(e.target.value))}
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                 />
+                <div className="text-xs text-gray-500 mt-1">
+                  Lower values = More matches (lenient)<br />
+                  Higher values = Fewer matches (strict)
+                </div>
               </div>
             )}
 

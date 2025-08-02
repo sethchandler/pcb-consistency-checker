@@ -14,6 +14,7 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
     numberOfPasses,
     passStrategy,
     temperatureSettings,
+    mergeTheta,
     setAnalysisResults,
     setError,
     setCurrentProgress,
@@ -66,6 +67,7 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
       numberOfPasses,
       passStrategy,
       temperatureSettings,
+      mergeTheta,
       (stage: string, passNumber?: number, totalPasses?: number) => {
         // Progress updates - display in UI instead of console
         const progressMessage = passNumber && totalPasses ? `${stage} ${passNumber}/${totalPasses}` : stage;

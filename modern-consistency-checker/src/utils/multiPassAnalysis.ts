@@ -1,6 +1,6 @@
 import { analyzeConsistency } from './consistencyCheckWrapper';
 import { calculateCost } from './modelPricing';
-import type { TokenUsage } from '../types';
+import { tfIdfMerge, simpleUnionMerge } from './tfIdfMerge';
 
 /**
  * Clean content to extract just the markdown table
@@ -88,246 +88,58 @@ ANALYTICAL DIVERSITY MANDATE: Employ a distinctly different reasoning pattern fr
 }
 
 /**
- * Merge two analysis results using intersection strategy
+ * Merge two analysis results using TF-IDF based intersection strategy
  */
 interface MergeReasoning {
   totalRowsA?: number;
   totalRowsB?: number;
   matchesFound?: number;
-  cacheBreakerId?: string;
+  theta?: number;
   approach?: string;
-  abstractionProcess?: Array<{
-    rowFromA: string;
-    abstractedIntent: string;
-    matchFoundInB: boolean;
-    matchingRowB?: string;
-    explanation: string;
+  matchDetails?: Array<{
+    similarity: number;
+    rowA: any;
+    rowB: any;
   }>;
   finalDecision?: string;
 }
 
-async function mergeIntersectionResults(
+function mergeIntersectionResults(
   resultA: string, 
   resultB: string,
-  apiKey: string,
-  selectedModel: string,
-  temperature: number
-): Promise<{ content: string; reasoning?: MergeReasoning; usage?: TokenUsage; cost: number }> {
-  // Detailed debug logging for content analysis
-  console.log('\n=== MERGE OPERATION: HUMAN-READABLE ANALYSIS ===');
-  console.log('📊 INPUT A (Full Content):');
-  console.log(resultA);
-  console.log('\n📊 INPUT B (Full Content):');
-  console.log(resultB);
-  console.log('\n🔍 ANALYSIS: What should a human expect to find in common?');
-  console.log('Look at the tables above and mentally identify which inconsistencies');
-  console.log('describe the SAME underlying problem (even with different wording).');
-  console.log('=== END HUMAN ANALYSIS SECTION ===\n');
+  theta: number
+): { content: string; reasoning?: MergeReasoning; cost: number } {
+  // Use TF-IDF merge instead of LLM
+  const mergeResult = tfIdfMerge(resultA, resultB, theta);
   
-  // Generate cache-busting elements
-  const cacheBreaker = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-  const analysisApproaches = [
-    'systematic cross-referencing methodology',
-    'forensic comparison analysis',
-    'semantic overlap detection',
-    'contextual similarity assessment',
-    'pattern-based matching analysis'
-  ];
-  const selectedApproach = analysisApproaches[Math.floor(Math.random() * analysisApproaches.length)];
+  // Parse the tables to get row counts for reasoning
+  const tableA = mergeResult.content.split('\n').filter(line => line.startsWith('|') && !line.includes('---|')).length - 1;
+  const tableB = resultB.split('\n').filter(line => line.startsWith('|') && !line.includes('---|')).length - 1;
   
-  const mergeInstructions = `Your task is to find matching rows between two tables.
-
-First, here are the two tables you must process:
-
-Table A:
-${resultA}
-
-Table B:
-${resultB}
-
-**Your Goal and Rules:**
-
-1. **Primary Goal:** Create a new table containing only the rows from **Table A** that have a matching fix in **Table B**.
-2. **Matching Rule:** A match occurs ONLY if the text in the "Recommended Fix" column describes the exact same action for the same document. Be conservative: if the fixes are similar but not identical, they do not match.
-3. **Output Format:** Provide your output as a single JSON object. Analyze EVERY row from Table A in your reasoning. Do not use placeholder text; use the actual data from the tables.
-
-Here is the JSON structure to use. Fill it with your analysis.
-
-\`\`\`json
-{
-  "mergedTable": "| Sources of Conflict | Nature of Inconsistency | Recommended Fix |\\n|---|---|---|\\n[matching rows from Table A here, copied exactly]",
-  "reasoning": {
-    "totalRowsA": 0,
-    "totalRowsB": 0,
-    "matchesFound": 0,
-    "cacheBreakerId": "${cacheBreaker}",
-    "approach": "${selectedApproach}",
-    "abstractionProcess": [
-      {
-        "rowFromA": "complete row text from Table A",
-        "abstractedIntent": "what specific fix is prescribed",
-        "matchFoundInB": false,
-        "matchingRowB": "matching row text from Table B or null",
-        "explanation": "why these fixes match or don't match"
-      }
-    ],
-    "finalDecision": "Included X rows that had identical fixes in Table B"
-  }
-}
-\`\`\`
-
-Analysis ID: ${cacheBreaker}`;
-
-  // Content is required by the API, even though tables are in the prompt
-  const mergeContent = "Process the tables provided in the prompt above.";
-
-  // LOG THE EXACT PROMPT BEING SENT TO CHATGPT
-  console.log('\n🚨 === EXACT PROMPT SENT TO CHATGPT ===');
-  console.log('PROMPT:');
-  console.log('='.repeat(80));
-  console.log(mergeInstructions);
-  console.log('='.repeat(80));
-  console.log('CONTENT:');
-  console.log('='.repeat(80));
-  console.log(mergeContent);
-  console.log('='.repeat(80));
-  console.log('END OF EXACT PROMPT');
-  console.log('🚨 === END EXACT PROMPT ===\n');
-
-  try {
-    const result = await analyzeConsistency({
-      prompt: mergeInstructions,
-      content: mergeContent,
-      apiKey,
-      model: selectedModel,
-      outputFormat: 'markdown',
-      temperature: temperature
-    });
-
-    if (!result.success) {
-      throw new Error(result.error || 'Merge analysis failed');
-    }
-
-    let cost = 0;
-    let usage: TokenUsage | undefined;
-    
-    if (result.usage) {
-      usage = {
-        promptTokens: result.usage.promptTokens,
-        completionTokens: result.usage.completionTokens,
-        totalTokens: result.usage.totalTokens
-      };
-      cost = calculateCost(selectedModel, usage);
-    }
-
-    const mergeOutput = result.rawResponse || '';
-    
-    // LOG THE EXACT RESPONSE FROM CHATGPT
-    console.log('\n🔥 === EXACT RESPONSE FROM CHATGPT ===');
-    console.log('RAW RESPONSE:');
-    console.log('='.repeat(80));
-    console.log(mergeOutput);
-    console.log('='.repeat(80));
-    console.log('END OF RAW RESPONSE');
-    console.log('🔥 === END EXACT RESPONSE ===\n');
-    
-    // Parse JSON response and extract table + reasoning
-    let finalTable = '';
-    let reasoning = null;
-    
-    try {
-      // Try to extract JSON from the response (might have markdown code blocks)
-      const jsonMatch = mergeOutput.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
-                       mergeOutput.match(/(\{[\s\S]*\})/);
-      
-      if (jsonMatch) {
-        const jsonResponse = JSON.parse(jsonMatch[1]);
-        finalTable = jsonResponse.mergedTable || '';
-        reasoning = jsonResponse.reasoning || null;
-        
-        console.log('\n✅ JSON PARSING SUCCESS');
-        console.log('📊 Extracted Table Length:', finalTable.length);
-        console.log('🧠 Reasoning Captured:', !!reasoning);
-        
-        if (reasoning) {
-          console.log('\n🔍 MERGE REASONING SUMMARY:');
-          console.log(`Total rows in A: ${reasoning.totalRowsA || 'unknown'}`);
-          console.log(`Total rows in B: ${reasoning.totalRowsB || 'unknown'}`);
-          console.log(`Matches found: ${reasoning.matchesFound || 'unknown'}`);
-          console.log(`Final decision: ${reasoning.finalDecision || 'none provided'}`);
-          
-          if (reasoning.abstractionProcess && reasoning.abstractionProcess.length > 0) {
-            console.log('\n🎯 ABSTRACTION PROCESS:');
-            reasoning.abstractionProcess.forEach((process: any, i: number) => {
-              console.log(`Row ${i + 1}: ${process.abstractedIntent}`);
-              console.log(`  Match found: ${process.matchFoundInB}`);
-              console.log(`  Explanation: ${process.explanation}`);
-            });
-          }
-        }
-      } else {
-        console.log('\n⚠️ JSON PARSING FAILED - Using raw response');
-        finalTable = mergeOutput;
-      }
-      
-    } catch (error: any) {
-      console.log('\n❌ JSON PARSE ERROR:', error?.message || 'Unknown error');
-      console.log('📝 Raw response:', mergeOutput);
-      finalTable = mergeOutput; // Fallback to raw response
-    }
-    
-    // Enhanced logging for human analysis
-    console.log('\n🤖 LLM MERGE DECISION:');
-    console.log('Raw Response Length:', mergeOutput.length);
-    console.log('Final Table Length:', finalTable.length);
-    console.log(`Approach used: ${selectedApproach}`);
-    console.log(`Temperature: ${temperature}`);
-    console.log(`Cache breaker: ${cacheBreaker}`);
-    console.log('\n=== END MERGE ANALYSIS ===\n');
-
-    return {
-      content: finalTable,
-      reasoning: reasoning, // Include reasoning in return for potential UI use
-      usage,
-      cost
-    };
-  } catch (error) {
-    console.error('Merge analysis failed:', error);
-    throw error;
-  }
+  // Build reasoning object from TF-IDF results
+  const reasoning: MergeReasoning = {
+    totalRowsA: Math.max(0, tableA),
+    totalRowsB: Math.max(0, tableB),
+    matchesFound: mergeResult.matchDetails.length,
+    theta: theta,
+    approach: 'TF-IDF cosine similarity',
+    matchDetails: mergeResult.matchDetails,
+    finalDecision: `Found ${mergeResult.matchDetails.length} matching rows using TF-IDF with theta=${theta}`
+  };
+  
+  return {
+    content: mergeResult.content,
+    reasoning,
+    cost: 0 // No API cost for local TF-IDF
+  };
 }
 
 /**
  * Simple client-side union of multiple analysis results
  */
 function mergeUnionResults(results: string[]): string {
-  // For union strategy, we simply concatenate all tables
-  // In a more sophisticated implementation, we could deduplicate similar inconsistencies
-  
-  const allTables = results
-    .map(result => {
-      // Extract just the table portion from each result
-      const tableMatch = result.match(/\|[\s\S]*?\|[\s\S]*?\|[\s\S]*?\|[\s\S]*?(?=\n\n|$)/);
-      return tableMatch ? tableMatch[0] : '';
-    })
-    .filter(table => table.trim())
-    .filter((table, index, arr) => arr.indexOf(table) === index); // Basic deduplication
-  
-  if (allTables.length === 0) {
-    return '| Sources of Conflict | Nature of Inconsistency | Recommended Fix |\n|---|---|---|\n';
-  }
-  
-  // Combine all tables, keeping only one header
-  const header = '| Sources of Conflict | Nature of Inconsistency | Recommended Fix |\n|---|---|---|';
-  const allRows = allTables
-    .map(table => {
-      const lines = table.split('\n');
-      // Skip header and separator lines, keep only data rows
-      return lines.slice(2).filter(line => line.trim() && line.includes('|'));
-    })
-    .flat();
-    
-  return header + '\n' + allRows.join('\n');
+  // Use the simpleUnionMerge from tfIdfMerge module which handles deduplication
+  return simpleUnionMerge(results);
 }
 
 /**
@@ -340,7 +152,8 @@ export async function runMultiPassAnalysis(
   selectedModel: string,
   numberOfPasses: number,
   strategy: 'intersection' | 'union',
-  temperatureSettings: { singlePass: number; multiPass: number; merge: number },
+  temperatureSettings: { singlePass: number; multiPass: number },
+  mergeTheta: number,
   onProgress: (stage: string, passNumber?: number, totalPasses?: number) => void,
   onCostUpdate: (cost: number, tokens: number) => void
 ): Promise<{ content: string; totalCost: number; totalTokens: number; mergeReasoning?: MergeReasoning[] }> {
@@ -454,12 +267,10 @@ export async function runMultiPassAnalysis(
       console.log(`Run ${runId}: About to merge - Previous length: ${previousResult?.length}, Current length: ${currentResult?.length}`);
       
       try {
-        const merged = await mergeIntersectionResults(
+        const merged = mergeIntersectionResults(
           previousResult,
           currentResult,
-          apiKey,
-          selectedModel,
-          temperatureSettings.merge
+          mergeTheta
         );
         
         // Clean the merged content to ensure it's just the table
@@ -471,11 +282,8 @@ export async function runMultiPassAnalysis(
           mergeReasoningArray.push(merged.reasoning);
         }
         
-        totalCost += merged.cost;
-        if (merged.usage) {
-          totalTokens += merged.usage.totalTokens;
-          onCostUpdate(merged.cost, merged.usage.totalTokens);
-        }
+        // No cost for local TF-IDF merge
+        totalCost += merged.cost; // Will be 0
       } catch (error) {
         console.error(`Run ${runId}: Failed to merge pass ${pass}:`, error);
         // Fall back to using just the current result

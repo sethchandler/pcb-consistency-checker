@@ -120,8 +120,8 @@ export interface ConsistencyStore {
   temperatureSettings: {
     singlePass: number;
     multiPass: number;
-    merge: number;
   };
+  mergeTheta: number;
   
   // Actions
   setUploadedFiles: (files: UploadedFile[]) => void;
@@ -136,7 +136,8 @@ export interface ConsistencyStore {
   setNumberOfPasses: (passes: 1 | 2 | 3) => void;
   setPassStrategy: (strategy: 'intersection' | 'union') => void;
   setCurrentProgress: (progress: string | null) => void;
-  setTemperatureSettings: (settings: { singlePass: number; multiPass: number; merge: number }) => void;
+  setTemperatureSettings: (settings: { singlePass: number; multiPass: number }) => void;
+  setMergeTheta: (theta: number) => void;
   addToCost: (cost: number, tokens: number) => void;
   resetSessionCost: () => void;
   reset: () => void;

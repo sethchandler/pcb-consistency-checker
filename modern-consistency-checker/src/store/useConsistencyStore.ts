@@ -82,9 +82,9 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   currentProgress: null,
   temperatureSettings: {
     singlePass: 0.3,   // Conservative for consistent results
-    multiPass: 0.5,    // Moderate for balanced creativity/consistency  
-    merge: 0.4         // Slightly conservative for reliable merging
+    multiPass: 0.4     // Slightly lower for better consistency across passes
   },
+  mergeTheta: 0.2,     // Default similarity threshold for TF-IDF merge
 
   // Actions
   setUploadedFiles: (files) => set({ uploadedFiles: files }),
@@ -114,6 +114,8 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   setCurrentProgress: (progress) => set({ currentProgress: progress }),
 
   setTemperatureSettings: (settings) => set({ temperatureSettings: settings }),
+
+  setMergeTheta: (theta) => set({ mergeTheta: theta }),
 
   addToCost: (cost, tokens) => set((state) => ({
     sessionCost: state.sessionCost + cost,
