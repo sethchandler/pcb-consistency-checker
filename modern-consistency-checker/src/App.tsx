@@ -45,10 +45,12 @@ function App() {
 
           {/* Right Column */}
           <div className="space-y-6">
-            <PassConfiguration />
             <PromptEditor />
           </div>
         </div>
+
+        {/* Pass Configuration */}
+        <PassConfiguration />
 
         {/* Analysis Control */}
         <AnalysisControl />

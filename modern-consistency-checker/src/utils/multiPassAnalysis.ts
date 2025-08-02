@@ -3,6 +3,15 @@ import { calculateCost } from './modelPricing';
 import type { TokenUsage } from '../types';
 
 /**
+ * Clean content to extract just the markdown table
+ */
+function cleanTableContent(content: string): string {
+  // Extract just the table from the content
+  const tableMatch = content.match(/\|[\s\S]*?\|[\s\S]*?\|[\s\S]*?\|[\s\S]*?(?=\n\n|$)/);
+  return tableMatch ? tableMatch[0] : content;
+}
+
+/**
  * Generate randomized prompt prefix for varied analysis approaches
  */
 function generateRandomPromptPrefix(passNumber: number, totalPasses: number): string {
@@ -45,27 +54,76 @@ async function mergeIntersectionResults(
   apiKey: string,
   selectedModel: string
 ): Promise<{ content: string; usage?: TokenUsage; cost: number }> {
-  const mergePrompt = `You are analyzing two independent consistency analysis results. Return ONLY the inconsistencies that appear in BOTH analyses.
+  // Debug logging
+  console.log('Merge inputs - Result A length:', resultA?.length, 'Result B length:', resultB?.length);
+  
+  const mergeInstructions = `YOU ARE A TABLE INTERSECTION OPERATOR
 
-ANALYSIS A:
+Your task: Given two inconsistency tables, return ONLY rows that represent the SAME inconsistency (by meaning, not exact text).
+
+CRITICAL CONCEPT - Semantic Similarity:
+- You must perform r1 × r2 comparisons (where r1 = rows in table 1, r2 = rows in table 2)
+- Compare the MEANING of each inconsistency, not the exact wording
+- Two rows describe the SAME inconsistency if they identify the same factual conflict
+- Different wording of the same problem = SAME inconsistency
+- Different problems entirely = DIFFERENT inconsistencies
+
+INPUT FORMAT:
+Both tables have exactly 3 columns:
+| Sources of Conflict | Nature of Inconsistency | Recommended Fix |
+
+OUTPUT FORMAT:
+You MUST return a table with the EXACT SAME 3 columns:
+| Sources of Conflict | Nature of Inconsistency | Recommended Fix |
+
+INTERSECTION RULES:
+1. For each row in Table A, check if it semantically matches ANY row in Table B
+2. If a match exists, include it in output (use the clearer/more detailed version)
+3. If no match exists, exclude it
+4. NEVER create new columns or change the table structure
+
+EXAMPLE OF SEMANTIC MATCHING:
+
+Table A row:
+| 1. Police Report<br>2. Witness Statement | Date discrepancy: Report says Jan 15, witness says Jan 20 | **Police Report**: Change to Jan 20 |
+
+Table B row:
+| 1. Official Report<br>2. J. Smith Testimony | Event date conflict: January 20 per testimony vs January 15 in report | **Official Report**: Update date to match testimony |
+
+THESE ARE THE SAME (different words, same meaning) - Include ONE in output
+
+EXAMPLE OF NON-MATCHING:
+
+Table A row:
+| 1. Contract<br>2. Invoice | Payment terms: Net 30 vs Net 45 | **Invoice**: Correct to Net 30 |
+
+Table B row:
+| 1. Contract<br>2. Email | Duration: 6 months vs 12 months claimed | **Email**: Correct to 6 months |
+
+THESE ARE DIFFERENT (both involve contract but different issues) - Include NEITHER
+
+YOU ARE FORBIDDEN FROM:
+- Creating comparison columns like "Document 1" or "Analysis A"
+- Adding row numbers or item numbers
+- Creating any new table structure
+- Adding explanatory text above or below the table
+
+OUTPUT:
+Return ONLY the intersection table with the standard 3 columns.
+If no common inconsistencies exist, return:
+| Sources of Conflict | Nature of Inconsistency | Recommended Fix |
+|---|---|---|`;
+
+  const mergeContent = `ANALYSIS A:
 ${resultA}
 
 ANALYSIS B:
-${resultB}
-
-Instructions:
-1. Compare the two analyses and identify inconsistencies that appear in BOTH
-2. An inconsistency "appears in both" if the same factual conflict is identified, even if worded differently
-3. Return results in the exact same markdown table format as the original analyses
-4. Include the same columns: Sources of Conflict, Nature of Inconsistency, Recommended Fix
-5. If no inconsistencies appear in both analyses, return an empty table with just headers
-
-Return only the unified table - no additional explanation or commentary.`;
+${resultB}`;
 
   try {
     const result = await analyzeConsistency({
-      prompt: mergePrompt,
-      content: '', // Content is already in the prompt
+      prompt: mergeInstructions,
+      content: mergeContent,
       apiKey,
       model: selectedModel,
       outputFormat: 'markdown'
@@ -214,12 +272,16 @@ export async function runMultiPassAnalysis(
     const passResult = result.rawResponse || '';
     analysisResults.push(passResult);
     
+    console.log(`Pass ${pass} result length:`, passResult.length); // Debug
+    
     // For intersection strategy, merge progressively
     if (strategy === 'intersection' && analysisResults.length >= 2) {
-      onProgress('Merging results', pass, numberOfPasses);
+      onProgress('Finding common inconsistencies', pass, numberOfPasses);
       
       const previousResult = mergedResult || analysisResults[analysisResults.length - 2];
       const currentResult = analysisResults[analysisResults.length - 1];
+      
+      console.log('About to merge - Previous length:', previousResult?.length, 'Current length:', currentResult?.length); // Debug
       
       try {
         const merged = await mergeIntersectionResults(
@@ -229,7 +291,8 @@ export async function runMultiPassAnalysis(
           selectedModel
         );
         
-        mergedResult = merged.content;
+        // Clean the merged content to ensure it's just the table
+        mergedResult = cleanTableContent(merged.content);
         totalCost += merged.cost;
         if (merged.usage) {
           totalTokens += merged.usage.totalTokens;
@@ -252,6 +315,8 @@ export async function runMultiPassAnalysis(
   } else {
     // Intersection: use the progressively merged result
     finalContent = mergedResult || (analysisResults.length > 0 ? analysisResults[0] : '');
+    // Ensure the final content is clean
+    finalContent = cleanTableContent(finalContent);
   }
   
   return {

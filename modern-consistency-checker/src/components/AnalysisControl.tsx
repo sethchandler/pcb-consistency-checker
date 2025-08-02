@@ -10,6 +10,7 @@ const AnalysisControl: React.FC = () => {
     uploadedFiles, 
     apiKey, 
     isProcessing,
+    currentProgress,
     setIsProcessing,
     setError 
   } = useConsistencyStore();
@@ -37,6 +38,7 @@ const AnalysisControl: React.FC = () => {
   };
 
   const getButtonText = () => {
+    if (isProcessing && currentProgress) return currentProgress;
     if (isProcessing) return 'Processing...';
     if (!hasFiles) return 'Upload Files First';
     if (!hasValidKey) return 'Enter API Key';

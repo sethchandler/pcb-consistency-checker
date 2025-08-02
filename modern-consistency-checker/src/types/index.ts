@@ -99,6 +99,7 @@ export interface ConsistencyStore {
   totalTokensUsed: number;
   numberOfPasses: 1 | 2 | 3;
   passStrategy: 'intersection' | 'union';
+  currentProgress: string | null;
   
   // Actions
   setUploadedFiles: (files: UploadedFile[]) => void;
@@ -112,6 +113,7 @@ export interface ConsistencyStore {
   setAnalysisEmphasis: (emphasis: AnalysisEmphasis) => void;
   setNumberOfPasses: (passes: 1 | 2 | 3) => void;
   setPassStrategy: (strategy: 'intersection' | 'union') => void;
+  setCurrentProgress: (progress: string | null) => void;
   addToCost: (cost: number, tokens: number) => void;
   resetSessionCost: () => void;
   reset: () => void;

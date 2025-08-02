@@ -79,6 +79,7 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   totalTokensUsed: 0,
   numberOfPasses: 1, // Default to single pass
   passStrategy: 'union', // Default to return all found
+  currentProgress: null,
 
   // Actions
   setUploadedFiles: (files) => set({ uploadedFiles: files }),
@@ -104,6 +105,8 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   setNumberOfPasses: (passes) => set({ numberOfPasses: passes }),
 
   setPassStrategy: (strategy) => set({ passStrategy: strategy }),
+
+  setCurrentProgress: (progress) => set({ currentProgress: progress }),
 
   addToCost: (cost, tokens) => set((state) => ({
     sessionCost: state.sessionCost + cost,

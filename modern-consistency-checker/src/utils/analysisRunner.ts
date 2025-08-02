@@ -15,6 +15,7 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
     passStrategy,
     setAnalysisResults,
     setError,
+    setCurrentProgress,
     addToCost
   } = useConsistencyStore.getState();
 
@@ -64,8 +65,9 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
       numberOfPasses,
       passStrategy,
       (stage: string, passNumber?: number, totalPasses?: number) => {
-        // Progress updates - we could enhance this later with more detailed progress
-        console.log(passNumber && totalPasses ? `${stage} ${passNumber}/${totalPasses}` : stage);
+        // Progress updates - display in UI instead of console
+        const progressMessage = passNumber && totalPasses ? `${stage} ${passNumber}/${totalPasses}` : stage;
+        setCurrentProgress(progressMessage);
       },
       (cost: number, tokens: number) => {
         // Cost updates - add to session tracking immediately
@@ -99,10 +101,12 @@ export const runConsistencyAnalysis = async (): Promise<void> => {
     };
 
     setAnalysisResults(analysisResult);
+    setCurrentProgress(null); // Clear progress when done
     
   } catch (error: any) {
     console.error('Analysis failed:', error);
     setError(error.message || 'Analysis failed');
+    setCurrentProgress(null); // Clear progress on error
     throw error;
   }
 };
