@@ -6,10 +6,6 @@ import { formatCost } from '../utils/modelPricing';
 const CostTracker: React.FC = () => {
   const { sessionCost, totalTokensUsed, resetSessionCost } = useConsistencyStore();
 
-  if (sessionCost === 0 && totalTokensUsed === 0) {
-    return null; // Don't show until there's been at least one analysis
-  }
-
   return (
     <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
       <div className="flex items-center justify-between">
