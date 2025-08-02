@@ -14,6 +14,30 @@ const PassConfiguration: React.FC = () => {
   
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Smart temperature defaults based on strategy
+  const getSmartDefaults = (strategy: 'union' | 'intersection') => {
+    if (strategy === 'union') {
+      return {
+        singlePass: 0.7,  // High creativity for finding diverse inconsistencies
+        multiPass: 0.8,   // Even more diversity across passes
+        merge: 0.4        // Not used in union, but reasonable default
+      };
+    } else {
+      return {
+        singlePass: 0.3,  // Consistent baseline
+        multiPass: 0.2,   // Very consistent for matching
+        merge: 0.1        // Ultra-consistent for reliable merging
+      };
+    }
+  };
+
+  // Apply smart defaults when strategy changes
+  const handleStrategyChange = (newStrategy: 'union' | 'intersection') => {
+    setPassStrategy(newStrategy);
+    const smartDefaults = getSmartDefaults(newStrategy);
+    setTemperatureSettings(smartDefaults);
+  };
+
   const passOptions = [
     { value: 1 as const, label: '1 Pass', description: 'Standard single analysis' },
     { value: 2 as const, label: '2 Passes', description: 'More thorough, ~2x time' },
@@ -24,12 +48,12 @@ const PassConfiguration: React.FC = () => {
     { 
       value: 'union' as const, 
       label: 'Return All Found', 
-      description: 'Show inconsistencies found in ANY pass (comprehensive)' 
+      description: 'Show inconsistencies found in ANY pass (comprehensive but likely to result in duplicated fixes)' 
     },
     { 
       value: 'intersection' as const, 
       label: 'Return Common Only', 
-      description: 'Show only inconsistencies found in ALL passes (high confidence)' 
+      description: 'Show only inconsistencies found in ALL passes (avoids duplicate fixes but likely to be underinclusive)' 
     }
   ];
 
@@ -121,7 +145,7 @@ const PassConfiguration: React.FC = () => {
                   name="passStrategy"
                   value={option.value}
                   checked={passStrategy === option.value}
-                  onChange={(e) => setPassStrategy(e.target.value as 'intersection' | 'union')}
+                  onChange={(e) => handleStrategyChange(e.target.value as 'intersection' | 'union')}
                   className="sr-only"
                 />
                 <div className="font-medium text-sm">{option.label}</div>
@@ -165,6 +189,25 @@ const PassConfiguration: React.FC = () => {
 
         {showAdvanced && (
           <div className="mt-4 space-y-4 bg-gray-50 rounded-lg p-4">
+            {/* Expert Warning */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+              <div className="flex items-start">
+                <HelpCircle className="h-4 w-4 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" />
+                <div className="text-xs text-yellow-800">
+                  <strong>⚠️ Advanced: Temperature settings affect analysis quality.</strong><br />
+                  Only modify if you understand the trade-offs. Values auto-adjust when you change strategy above.
+                </div>
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-600 mb-3">
+              <strong>Current Strategy Impact:</strong><br />
+              {passStrategy === 'union' 
+                ? 'Union (Return All): Higher temps for diverse, creative inconsistency detection'
+                : 'Intersection (Common Only): Lower temps for consistent, reliable consensus'
+              }
+            </div>
+
             <p className="text-xs text-gray-600 mb-3">
               Lower values (0.0-0.3) = More consistent, focused results<br />
               Higher values (0.7-1.0) = More creative, varied results
@@ -247,16 +290,12 @@ const PassConfiguration: React.FC = () => {
               </div>
             )}
 
-            {/* Reset to Defaults */}
+            {/* Reset to Smart Defaults */}
             <button
-              onClick={() => setTemperatureSettings({
-                singlePass: 0.3,
-                multiPass: 0.5,
-                merge: 0.4
-              })}
+              onClick={() => setTemperatureSettings(getSmartDefaults(passStrategy))}
               className="text-xs text-blue-600 hover:text-blue-800 underline"
             >
-              Reset to defaults
+              Reset to smart defaults for {passStrategy === 'union' ? 'Union' : 'Intersection'} strategy
             </button>
           </div>
         )}
