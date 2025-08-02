@@ -140,18 +140,12 @@ export function tfIdfMerge(
   resultB: string,
   theta: number = 0.2
 ): { content: string; matchDetails: Array<{ similarity: number; rowA: any; rowB: any }> } {
-  console.log('\n=== TF-IDF MERGE OPERATION ===');
-  console.log(`Theta threshold: ${theta}`);
   
   // Parse tables
   const tableA = parseMarkdownTable(resultA);
   const tableB = parseMarkdownTable(resultB);
   
-  console.log(`Table A rows: ${tableA.length}`);
-  console.log(`Table B rows: ${tableB.length}`);
-  
   if (tableA.length === 0 || tableB.length === 0) {
-    console.log('One or both tables are empty, returning empty result');
     return {
       content: '| Sources of Conflict | Nature of Inconsistency | Recommended Fix |\n|---|---|---|',
       matchDetails: []
@@ -165,7 +159,6 @@ export function tfIdfMerge(
   
   // Build vocabulary and calculate IDF scores
   const vocab = buildVocabulary(allDocs);
-  console.log(`Vocabulary size: ${vocab.length} terms`);
   
   const idfScores: Record<string, number> = {};
   vocab.forEach(term => {
@@ -191,8 +184,6 @@ export function tfIdfMerge(
       }
     }
     
-    console.log(`Row ${i + 1}: Best similarity = ${bestMatch.similarity.toFixed(3)}`);
-    
     if (bestMatch.similarity >= theta) {
       matchedRows.push(tableA[i]);
       matchDetails.push({
@@ -200,14 +191,9 @@ export function tfIdfMerge(
         rowA: tableA[i],
         rowB: tableB[bestMatch.indexB]
       });
-      console.log(`  ✓ Match found with row ${bestMatch.indexB + 1} of Table B`);
-    } else {
-      console.log(`  ✗ No match above threshold`);
     }
   }
   
-  console.log(`\nTotal matches found: ${matchedRows.length} of ${tableA.length} rows`);
-  console.log('=== END TF-IDF MERGE ===\n');
   
   // Reconstruct markdown table
   let resultTable = '| Sources of Conflict | Nature of Inconsistency | Recommended Fix |\n|---|---|---|\n';

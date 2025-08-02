@@ -5,9 +5,9 @@ import { tfIdfMerge, simpleUnionMerge } from './tfIdfMerge';
 /**
  * Clean content to extract just the markdown table
  */
-function cleanTableContent(content: string): string {
+export function cleanTableContent(content: string): string {
   // Extract just the table from the content
-  const tableMatch = content.match(/\|[\s\S]*?\|[\s\S]*?\|[\s\S]*?\|[\s\S]*?(?=\n\n|$)/);
+  const tableMatch = content.match(/\|[\s\S]*?\|[\s\S]*?\|[\s\S]*?\|[\s\S]*?\|[\s\S]*?(?=\n\n|$)/);
   return tableMatch ? tableMatch[0] : content;
 }
 
@@ -201,17 +201,13 @@ export async function runMultiPassAnalysis(
   
   // Multi-pass analysis - explicit state initialization
   const analysisResults: string[] = [];
-  let mergedResult: string = '';  // Explicitly typed and initialized
   
   for (let pass = 1; pass <= numberOfPasses; pass++) {
-    console.log(`Run ${runId}: Starting pass ${pass}/${numberOfPasses}`);
     onProgress('Running analysis pass', pass, numberOfPasses);
     
     // Generate randomized prompt for this pass
     const randomPrefix = generateRandomPromptPrefix(pass, numberOfPasses);
     const randomizedPrompt = randomPrefix + basePrompt;
-    
-    console.log(`Run ${runId}: Pass ${pass} prompt prefix length: ${randomPrefix.length}`);
     
     // Run the analysis for this pass with configurable temperature
     const result = await analyzeConsistency({
@@ -239,58 +235,9 @@ export async function runMultiPassAnalysis(
     const passResult = result.rawResponse || '';
     analysisResults.push(passResult);
     
-    console.log(`Run ${runId}: Pass ${pass} completed - result length: ${passResult.length}`);
     
-    // Human-readable logging of individual pass results
-    console.log(`\n=== PASS ${pass} DETAILED RESULTS ===`);
-    console.log('FULL RESULT:');
-    console.log(passResult);
-    console.log(`=== END PASS ${pass} ===\n`);
-    
-    // For intersection strategy, merge progressively
-    if (strategy === 'intersection' && analysisResults.length >= 2) {
-      onProgress('Finding common inconsistencies', pass, numberOfPasses);
-      
-      // Determine what to merge with current result
-      let previousResult: string;
-      if (pass === 2) {
-        // First merge: use the first analysis result
-        previousResult = analysisResults[0];
-        console.log(`Run ${runId}: First merge - using pass 1 result (length: ${previousResult.length})`);
-      } else {
-        // Subsequent merges: use the previously merged result
-        previousResult = mergedResult;
-        console.log(`Run ${runId}: Subsequent merge - using previous merged result (length: ${previousResult.length})`);
-      }
-      
-      const currentResult = analysisResults[analysisResults.length - 1];
-      
-      console.log(`Run ${runId}: About to merge - Previous length: ${previousResult?.length}, Current length: ${currentResult?.length}`);
-      
-      try {
-        const merged = mergeIntersectionResults(
-          previousResult,
-          currentResult,
-          mergeTheta
-        );
-        
-        // Clean the merged content to ensure it's just the table
-        mergedResult = cleanTableContent(merged.content);
-        console.log(`Run ${runId}: Merge completed - result length: ${mergedResult.length}`);
-        
-        // Store reasoning for UI display
-        if (merged.reasoning) {
-          mergeReasoningArray.push(merged.reasoning);
-        }
-        
-        // No cost for local TF-IDF merge
-        totalCost += merged.cost; // Will be 0
-      } catch (error) {
-        console.error(`Run ${runId}: Failed to merge pass ${pass}:`, error);
-        // Fall back to using just the current result
-        mergedResult = currentResult;
-      }
-    }
+    // No merging during passes - just store raw results
+    // All merging will happen later with live theta adjustment
   }
   
   // Final result processing
@@ -299,13 +246,33 @@ export async function runMultiPassAnalysis(
   if (strategy === 'union') {
     // Union: combine all results client-side
     finalContent = mergeUnionResults(analysisResults);
-    console.log(`Run ${runId}: Union strategy - final content length: ${finalContent.length}`);
   } else {
-    // Intersection: use the progressively merged result
-    finalContent = mergedResult || (analysisResults.length > 0 ? analysisResults[0] : '');
-    // Ensure the final content is clean
-    finalContent = cleanTableContent(finalContent);
-    console.log(`Run ${runId}: Intersection strategy - final content length: ${finalContent.length} (from mergedResult: ${mergedResult.length})`);
+    // Intersection: do progressive merge at the end with the stored theta
+    if (analysisResults.length === 1) {
+      finalContent = analysisResults[0];
+    } else if (analysisResults.length >= 2) {
+      onProgress('Merging results with similarity threshold');
+      
+      // Progressive merge: A+B→A', A'+C→A''
+      let result = analysisResults[0];
+      for (let i = 1; i < analysisResults.length; i++) {
+        try {
+          const merged = mergeIntersectionResults(result, analysisResults[i], mergeTheta);
+          result = cleanTableContent(merged.content);
+          
+          // Store reasoning for UI display
+          if (merged.reasoning) {
+            mergeReasoningArray.push(merged.reasoning);
+          }
+        } catch (error) {
+          console.error(`Run ${runId}: Failed to merge results ${i}:`, error);
+          // Continue with current result
+        }
+      }
+      finalContent = result;
+    } else {
+      finalContent = '';
+    }
   }
   
   console.log(`Run ${runId}: Completed - Total cost: $${totalCost.toFixed(5)}, Total tokens: ${totalTokens}`);

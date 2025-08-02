@@ -81,10 +81,10 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   passStrategy: 'intersection', // Always use intersection with theta culling
   currentProgress: null,
   temperatureSettings: {
-    singlePass: 0.3,   // Conservative for consistent results
-    multiPass: 0.4     // Slightly lower for better consistency across passes
+    singlePass: 0.3,   // Conservative for consistent results  
+    multiPass: 0.4     // Slightly higher for varied approaches across passes
   },
-  mergeTheta: 0.2,     // Default similarity threshold for TF-IDF merge
+  mergeTheta: 0.1,     // Default similarity threshold for TF-IDF merge
   rawPassResults: [],  // Store individual pass results for live theta adjustment
   lastAnalysisSettings: null, // Remember settings used for stored raw results
 

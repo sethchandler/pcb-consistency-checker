@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FileText, Clock, Users, Download, Copy, Check, ChevronDown, Brain, Sliders } from 'lucide-react';
 import { marked } from 'marked';
 import { useConsistencyStore } from '../store/useConsistencyStore';
 import { addTableNumbering, countInconsistencies } from '../utils/tableNumbering';
 import { tfIdfMerge } from '../utils/tfIdfMerge';
+import { cleanTableContent } from '../utils/multiPassAnalysis';
 
 const ResultsDisplay: React.FC = () => {
   const { 
@@ -17,26 +18,60 @@ const ResultsDisplay: React.FC = () => {
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
   const [liveThetaValue, setLiveThetaValue] = useState(mergeTheta);
+  const [debouncedTheta, setDebouncedTheta] = useState(liveThetaValue);
+
+  // Debounce theta changes to prevent excessive recalculations during slider movement
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTheta(liveThetaValue);
+    }, 200); // 200ms debounce
+    
+    return () => clearTimeout(timer);
+  }, [liveThetaValue]);
 
   // Determine if we should show live theta controls and use live merging
   const shouldUseLiveMerging = rawPassResults.length > 1 && 
                                lastAnalysisSettings?.passStrategy === 'intersection';
 
+  // Validate state consistency to prevent race conditions
+  const isStateConsistent = useMemo(() => {
+    if (!analysisResults) return true; // No analysis yet - consistent
+    if (!shouldUseLiveMerging) return true; // Single pass - no sync needed
+    
+    // For multipass intersection, we need raw results to be available
+    const hasValidRawResults = rawPassResults.length >= 2;
+    const hasMatchingPassCount = rawPassResults.length === lastAnalysisSettings?.numberOfPasses;
+    
+    return hasValidRawResults && hasMatchingPassCount;
+  }, [analysisResults, shouldUseLiveMerging, rawPassResults, lastAnalysisSettings]);
+
+  // TODO: Add vocabulary caching for TF-IDF optimization in future iteration
+
   // Compute live merged content when theta changes
   const liveContent = useMemo(() => {
-    if (!analysisResults || !shouldUseLiveMerging || rawPassResults.length < 2) {
-      return analysisResults?.content || ''; // Use stored content for single pass
+    if (!analysisResults) {
+      return ''; // No analysis results yet
+    }
+    
+    if (!shouldUseLiveMerging || rawPassResults.length < 2) {
+      return analysisResults.content; // Use stored content for single pass
     }
 
-    // Perform progressive intersection merge with live theta
+    // Check for state consistency before attempting live merging
+    if (!isStateConsistent) {
+      console.warn('State inconsistency detected: rawPassResults and analysisResults out of sync');
+      return analysisResults.content; // Fall back to stored content with warning
+    }
+
+    // Perform progressive intersection merge with debounced theta
     let result = rawPassResults[0];
     for (let i = 1; i < rawPassResults.length; i++) {
-      const mergeResult = tfIdfMerge(result, rawPassResults[i], liveThetaValue);
-      result = mergeResult.content;
+      const mergeResult = tfIdfMerge(result, rawPassResults[i], debouncedTheta);
+      result = cleanTableContent(mergeResult.content);
     }
     
     return result;
-  }, [analysisResults, liveThetaValue, rawPassResults, shouldUseLiveMerging]);
+  }, [analysisResults, debouncedTheta, rawPassResults, shouldUseLiveMerging, isStateConsistent]);
 
   // Count matches for the current theta
   const currentMatchCount = useMemo(() => {
@@ -248,16 +283,40 @@ const ResultsDisplay: React.FC = () => {
 
       {/* Live Theta Control for Multi-pass Intersection */}
       {shouldUseLiveMerging && (
-        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className={`mb-6 rounded-lg p-4 ${
+          isStateConsistent 
+            ? 'bg-blue-50 border border-blue-200' 
+            : 'bg-orange-50 border border-orange-200'
+        }`}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-medium text-blue-800 flex items-center">
               <Sliders className="mr-2" size={20} />
               Live Similarity Threshold (θ)
             </h3>
-            <span className="text-sm text-blue-600">
-              {currentMatchCount} match{currentMatchCount === 1 ? '' : 'es'} at θ={liveThetaValue.toFixed(2)}
+            <span className={`text-sm ${isStateConsistent ? 'text-blue-600' : 'text-orange-600'}`}>
+              {isStateConsistent ? (
+                <>
+                  {currentMatchCount} match{currentMatchCount === 1 ? '' : 'es'} at θ={debouncedTheta.toFixed(2)}
+                  {liveThetaValue !== debouncedTheta && (
+                    <span className="ml-1 text-xs text-gray-500">
+                      (updating to {liveThetaValue.toFixed(2)}...)
+                    </span>
+                  )}
+                </>
+              ) : (
+                'State sync issue - using stored results'
+              )}
             </span>
           </div>
+          
+          {/* State inconsistency warning */}
+          {!isStateConsistent && (
+            <div className="mb-3 p-2 bg-orange-100 border border-orange-300 rounded text-sm text-orange-800">
+              ⚠️ <strong>State Synchronization Issue:</strong> Raw pass results and analysis results are out of sync. 
+              Live theta adjustment is temporarily disabled. Please re-run the analysis.
+            </div>
+          )}
+          
           <div className="space-y-2">
             <label className="block text-sm font-medium text-blue-700">
               Threshold: {liveThetaValue.toFixed(2)} 
@@ -268,35 +327,50 @@ const ResultsDisplay: React.FC = () => {
             <input
               type="range"
               min="0"
-              max="1"
+              max="0.4"
               step="0.01"
               value={liveThetaValue}
               onChange={(e) => setLiveThetaValue(parseFloat(e.target.value))}
-              className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
+              disabled={!isStateConsistent}
+              className={`w-full h-2 rounded-lg appearance-none ${
+                isStateConsistent 
+                  ? 'bg-blue-200 cursor-pointer' 
+                  : 'bg-gray-200 cursor-not-allowed opacity-50'
+              }`}
             />
-            <div className="flex justify-between text-xs text-blue-600">
-              <span>0.00 (Lenient)</span>
-              <span>0.50 (Moderate)</span>
-              <span>1.00 (Strict)</span>
-            </div>
             <div className="flex justify-between mt-2">
               <button
+                onClick={() => setLiveThetaValue(0.02)}
+                disabled={!isStateConsistent}
+                className={`text-xs px-2 py-1 rounded ${
+                  isStateConsistent
+                    ? 'bg-blue-200 text-blue-800 hover:bg-blue-300 cursor-pointer'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-50'
+                }`}
+              >
+                Lenient (0.02)
+              </button>
+              <button
                 onClick={() => setLiveThetaValue(0.1)}
-                className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300"
+                disabled={!isStateConsistent}
+                className={`text-xs px-2 py-1 rounded ${
+                  isStateConsistent
+                    ? 'bg-blue-200 text-blue-800 hover:bg-blue-300 cursor-pointer'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-50'
+                }`}
               >
-                Lenient (0.1)
+                Default (0.1)
               </button>
               <button
-                onClick={() => setLiveThetaValue(0.2)}
-                className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300"
+                onClick={() => setLiveThetaValue(0.3)}
+                disabled={!isStateConsistent}
+                className={`text-xs px-2 py-1 rounded ${
+                  isStateConsistent
+                    ? 'bg-blue-200 text-blue-800 hover:bg-blue-300 cursor-pointer'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-50'
+                }`}
               >
-                Default (0.2)
-              </button>
-              <button
-                onClick={() => setLiveThetaValue(0.5)}
-                className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300"
-              >
-                Strict (0.5)
+                Strict (0.3)
               </button>
             </div>
           </div>
