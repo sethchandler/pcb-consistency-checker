@@ -73,6 +73,7 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   isProcessing: false,
   error: null,
   apiKey: '',
+  selectedProvider: 'openai',
   selectedModel: 'gpt-4o-mini',
   analysisEmphasis: 'avoid-false-negatives', // Default as requested
   sessionCost: 0,
@@ -104,6 +105,8 @@ export const useConsistencyStore = create<ConsistencyStore>((set) => ({
   setError: (error) => set({ error }),
   
   setApiKey: (key) => set({ apiKey: key }),
+  
+  setSelectedProvider: (provider) => set({ selectedProvider: provider }),
   
   setSelectedModel: (model) => set({ selectedModel: model }),
 

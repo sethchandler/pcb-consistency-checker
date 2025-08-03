@@ -169,28 +169,44 @@ export function tfIdfMerge(
   const vectorsA = docsA.map(doc => createTfIdfVector(doc, vocab, idfScores));
   const vectorsB = docsB.map(doc => createTfIdfVector(doc, vocab, idfScores));
   
-  // Find matches using cosine similarity
-  const matchedRows: typeof tableA = [];
+  // Find matches using cosine similarity with correct theta logic
+  const finalRows: typeof tableA = [];
   const matchDetails: Array<{ similarity: number; rowA: any; rowB: any }> = [];
+  const duplicateIndicesB = new Set<number>(); // Track which tableB rows are duplicates
   
-  for (let i = 0; i < tableA.length; i++) {
-    let bestMatch = { similarity: 0, indexB: -1 };
+  // Step 1: Add all rows from tableA (they always get included)
+  tableA.forEach(row => finalRows.push(row));
+  
+  // Step 2: For each row in tableB, check if it's a duplicate of something in tableA
+  for (let j = 0; j < tableB.length; j++) {
+    let bestMatch = { similarity: 0, indexA: -1 };
     
-    for (let j = 0; j < tableB.length; j++) {
+    // Find best match in tableA for this row from tableB
+    for (let i = 0; i < tableA.length; i++) {
       const similarity = cosineSimilarity(vectorsA[i], vectorsB[j]);
       
       if (similarity > bestMatch.similarity) {
-        bestMatch = { similarity, indexB: j };
+        bestMatch = { similarity, indexA: i };
       }
     }
     
-    if (bestMatch.similarity >= theta) {
-      matchedRows.push(tableA[i]);
+    if (bestMatch.similarity >= (1 - theta) && bestMatch.indexA !== -1) {
+      // This tableB row is similar enough to a tableA row - consider it a duplicate
+      // Using (1-theta) so theta=0 means no deduplication, theta=1 means maximum deduplication
+      duplicateIndicesB.add(j);
       matchDetails.push({
         similarity: bestMatch.similarity,
-        rowA: tableA[i],
-        rowB: tableB[bestMatch.indexB]
+        rowA: tableA[bestMatch.indexA],
+        rowB: tableB[j]
       });
+    }
+  }
+  
+  // Step 3: Add non-duplicate rows from tableB
+  for (let j = 0; j < tableB.length; j++) {
+    if (!duplicateIndicesB.has(j)) {
+      // This row from tableB is unique enough - add it
+      finalRows.push(tableB[j]);
     }
   }
   
@@ -198,8 +214,8 @@ export function tfIdfMerge(
   // Reconstruct markdown table
   let resultTable = '| Sources of Conflict | Nature of Inconsistency | Recommended Fix |\n|---|---|---|\n';
   
-  if (matchedRows.length > 0) {
-    matchedRows.forEach(row => {
+  if (finalRows.length > 0) {
+    finalRows.forEach(row => {
       resultTable += `| ${row.sources} | ${row.nature} | ${row.recommendedFix} |\n`;
     });
   }

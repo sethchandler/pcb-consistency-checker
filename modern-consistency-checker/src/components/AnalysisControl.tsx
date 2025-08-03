@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { Eye, Search, Loader2 } from 'lucide-react';
 import { useConsistencyStore } from '../store/useConsistencyStore';
-import { isValidAPIKey } from '../utils/consistencyCheckWrapper';
+import { isValidApiKey } from '../utils/modelProviders';
 import PreviewModal from './PreviewModal';
-import { runConsistencyAnalysis } from '../utils/analysisRunner';
+import { runConsistencyAnalysis } from '../utils/analysisRunnerNew';
 
 const AnalysisControl: React.FC = () => {
   const { 
     uploadedFiles, 
-    apiKey, 
+    apiKey,
+    selectedProvider,
     isProcessing,
     currentProgress,
     setIsProcessing,
@@ -18,7 +19,8 @@ const AnalysisControl: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
 
   const hasFiles = uploadedFiles.length > 0;
-  const hasValidKey = isValidAPIKey(apiKey);
+  const needsApiKey = selectedProvider !== 'ollama';
+  const hasValidKey = needsApiKey ? isValidApiKey(selectedProvider, apiKey) : true;
   const canAnalyze = hasFiles && hasValidKey && !isProcessing;
 
   const handleAnalysis = async () => {
@@ -41,7 +43,7 @@ const AnalysisControl: React.FC = () => {
     if (isProcessing && currentProgress) return currentProgress;
     if (isProcessing) return 'Processing...';
     if (!hasFiles) return 'Upload Files First';
-    if (!hasValidKey) return 'Enter API Key';
+    if (needsApiKey && !hasValidKey) return 'Enter API Key';
     return 'Process & Analyze Documents';
   };
 

@@ -51,6 +51,8 @@ export async function analyzeConsistency(options: {
 }
 
 export function isValidAPIKey(apiKey: string): boolean {
+  // This function is kept for backward compatibility
+  // Use isValidApiKey from modelProviders for provider-specific validation
   if (!window.consistencyCheckCore) {
     // Fallback implementation
     return !!(apiKey && apiKey.trim().startsWith('sk-') && apiKey.trim().length > 20);

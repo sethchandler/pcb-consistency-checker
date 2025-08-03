@@ -1,24 +1,5 @@
-import { analyzeConsistency } from './consistencyCheckWrapper';
+import { callLlmApi, calculateCost } from './modelProviders';
 import { tfIdfMerge, simpleUnionMerge } from './tfIdfMerge';
-
-// Legacy cost calculation for OpenAI models (kept for backward compatibility)
-function calculateLegacyCost(model: string, usage: any): number {
-  const modelPricing: Record<string, {inputCostPer1K: number; outputCostPer1K: number}> = {
-    'gpt-4o': { inputCostPer1K: 0.0025, outputCostPer1K: 0.01 },
-    'gpt-4o-mini': { inputCostPer1K: 0.00015, outputCostPer1K: 0.0006 },
-    'gpt-4.1-mini': { inputCostPer1K: 0.0004, outputCostPer1K: 0.0016 },
-    'gpt-4.1-nano': { inputCostPer1K: 0.0001, outputCostPer1K: 0.0004 },
-    'gpt-3.5-turbo': { inputCostPer1K: 0.0005, outputCostPer1K: 0.0015 },
-  };
-  
-  const pricing = modelPricing[model];
-  if (!pricing) return 0;
-  
-  const inputCost = (usage.promptTokens / 1000) * pricing.inputCostPer1K;
-  const outputCost = (usage.completionTokens / 1000) * pricing.outputCostPer1K;
-  
-  return inputCost + outputCost;
-}
 
 /**
  * Clean content to extract just the markdown table
@@ -161,12 +142,13 @@ function mergeUnionResults(results: string[]): string {
 }
 
 /**
- * Run multi-pass analysis with progress callbacks
+ * Run multi-pass analysis with progress callbacks - now supports multiple providers
  */
 export async function runMultiPassAnalysis(
   basePrompt: string,
   content: string,
-  apiKey: string,
+  providerId: string,
+  apiKey: string | null,
   selectedModel: string,
   numberOfPasses: number,
   strategy: 'intersection' | 'union',
@@ -188,34 +170,37 @@ export async function runMultiPassAnalysis(
     // Single pass - no special handling needed
     onProgress('Running analysis...');
     
-    const result = await analyzeConsistency({
-      prompt: basePrompt,
-      content,
-      apiKey,
-      model: selectedModel,
-      outputFormat: 'markdown',
-      temperature: temperatureSettings.singlePass
-    });
+    // Format messages for the API call
+    const messages = [
+      { role: 'user', content: `${basePrompt}\n\n${content}` }
+    ];
     
-    if (!result.success) {
-      throw new Error(result.error || 'Analysis failed');
+    try {
+      const result = await callLlmApi(
+        providerId,
+        apiKey,
+        selectedModel,
+        messages,
+        temperatureSettings.singlePass
+      );
+      
+      if (result.usage) {
+        const cost = calculateCost(providerId, selectedModel, result.usage.inputTokens, result.usage.outputTokens);
+        totalCost = cost;
+        totalTokens = result.usage.totalTokens;
+        onCostUpdate(cost, result.usage.totalTokens);
+      }
+      
+      return {
+        content: result.content,
+        totalCost,
+        totalTokens,
+        mergeReasoning: [], // No merge reasoning for single pass
+        rawResults: [result.content] // Single pass raw result
+      };
+    } catch (error: any) {
+      throw new Error(`Analysis failed: ${error.message}`);
     }
-    
-    if (result.usage) {
-      // Simple cost calculation for OpenAI models (legacy compatibility)
-      const cost = calculateLegacyCost(selectedModel, result.usage);
-      totalCost = cost;
-      totalTokens = result.usage.totalTokens;
-      onCostUpdate(cost, result.usage.totalTokens);
-    }
-    
-    return {
-      content: result.rawResponse || '',
-      totalCost,
-      totalTokens,
-      mergeReasoning: [], // No merge reasoning for single pass
-      rawResults: [result.rawResponse || ''] // Single pass raw result
-    };
   }
   
   // Multi-pass analysis - explicit state initialization
@@ -228,32 +213,35 @@ export async function runMultiPassAnalysis(
     const randomPrefix = generateRandomPromptPrefix(pass, numberOfPasses);
     const randomizedPrompt = randomPrefix + basePrompt;
     
-    // Run the analysis for this pass with configurable temperature
-    const result = await analyzeConsistency({
-      prompt: randomizedPrompt,
-      content,
-      apiKey,
-      model: selectedModel,
-      outputFormat: 'markdown',
-      temperature: temperatureSettings.multiPass
-    });
+    // Format messages for the API call
+    const messages = [
+      { role: 'user', content: `${randomizedPrompt}\n\n${content}` }
+    ];
     
-    if (!result.success) {
-      console.warn(`Run ${runId}: Pass ${pass} failed: ${result.error}`);
+    try {
+      // Run the analysis for this pass with configurable temperature
+      const result = await callLlmApi(
+        providerId,
+        apiKey,
+        selectedModel,
+        messages,
+        temperatureSettings.multiPass
+      );
+      
+      // Track cost
+      if (result.usage) {
+        const cost = calculateCost(providerId, selectedModel, result.usage.inputTokens, result.usage.outputTokens);
+        totalCost += cost;
+        totalTokens += result.usage.totalTokens;
+        onCostUpdate(cost, result.usage.totalTokens);
+      }
+      
+      analysisResults.push(result.content);
+      
+    } catch (error: any) {
+      console.warn(`Run ${runId}: Pass ${pass} failed: ${error.message}`);
       continue; // Continue with other passes
     }
-    
-    // Track cost
-    if (result.usage) {
-      const cost = calculateLegacyCost(selectedModel, result.usage);
-      totalCost += cost;
-      totalTokens += result.usage.totalTokens;
-      onCostUpdate(cost, result.usage.totalTokens);
-    }
-    
-    const passResult = result.rawResponse || '';
-    analysisResults.push(passResult);
-    
     
     // No merging during passes - just store raw results
     // All merging will happen later with live theta adjustment
@@ -266,41 +254,41 @@ export async function runMultiPassAnalysis(
     // Union: combine all results client-side
     finalContent = mergeUnionResults(analysisResults);
   } else {
-    // Intersection: do progressive merge at the end with the stored theta
-    if (analysisResults.length === 1) {
+    // Intersection: progressive merge using TF-IDF (local, no API cost)
+    if (analysisResults.length === 0) {
+      finalContent = '| Sources of Conflict | Nature of Inconsistency | Recommended Fix |\n|---|---|---|';
+    } else if (analysisResults.length === 1) {
       finalContent = analysisResults[0];
-    } else if (analysisResults.length >= 2) {
-      onProgress('Merging results with similarity threshold');
+    } else {
+      // Progressive merge A+B→A', A'+C→A'' etc.
+      let mergedResult = analysisResults[0];
       
-      // Progressive merge: A+B→A', A'+C→A''
-      let result = analysisResults[0];
       for (let i = 1; i < analysisResults.length; i++) {
-        try {
-          const merged = mergeIntersectionResults(result, analysisResults[i], mergeTheta);
-          result = cleanTableContent(merged.content);
-          
-          // Store reasoning for UI display
-          if (merged.reasoning) {
-            mergeReasoningArray.push(merged.reasoning);
-          }
-        } catch (error) {
-          console.error(`Run ${runId}: Failed to merge results ${i}:`, error);
-          // Continue with current result
+        onProgress('Merging results with TF-IDF', i, analysisResults.length - 1);
+        
+        // Clean table content before merging
+        mergedResult = cleanTableContent(mergedResult);
+        const passResult = cleanTableContent(analysisResults[i]);
+        
+        const mergeResult = mergeIntersectionResults(mergedResult, passResult, mergeTheta);
+        mergedResult = mergeResult.content;
+        
+        if (mergeResult.reasoning) {
+          mergeReasoningArray.push(mergeResult.reasoning);
         }
       }
-      finalContent = result;
-    } else {
-      finalContent = '';
+      
+      finalContent = mergedResult;
     }
   }
   
-  console.log(`Run ${runId}: Completed - Total cost: $${totalCost.toFixed(5)}, Total tokens: ${totalTokens}`);
+  console.log(`Run ${runId} complete. Total cost: $${totalCost.toFixed(4)}, Total tokens: ${totalTokens}`);
   
   return {
     content: finalContent,
     totalCost,
     totalTokens,
     mergeReasoning: mergeReasoningArray,
-    rawResults: analysisResults // Return all individual pass results
+    rawResults: analysisResults // Return all raw results for live theta adjustment
   };
 }

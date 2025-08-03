@@ -64,9 +64,12 @@ const ResultsDisplay: React.FC = () => {
     }
 
     // Perform progressive intersection merge with debounced theta
+    // Map slider value (0-0.99) to effective theta range (0.5-0.995)
+    const mappedTheta = 0.5 + (0.5 * debouncedTheta);
+    
     let result = rawPassResults[0];
     for (let i = 1; i < rawPassResults.length; i++) {
-      const mergeResult = tfIdfMerge(result, rawPassResults[i], debouncedTheta);
+      const mergeResult = tfIdfMerge(result, rawPassResults[i], mappedTheta);
       result = cleanTableContent(mergeResult.content);
     }
     
@@ -327,7 +330,7 @@ const ResultsDisplay: React.FC = () => {
             <input
               type="range"
               min="0"
-              max="0.4"
+              max="0.99"
               step="0.01"
               value={liveThetaValue}
               onChange={(e) => setLiveThetaValue(parseFloat(e.target.value))}
@@ -338,20 +341,20 @@ const ResultsDisplay: React.FC = () => {
                   : 'bg-gray-200 cursor-not-allowed opacity-50'
               }`}
             />
-            <div className="flex justify-between mt-2">
+            <div className="flex justify-between gap-1 mt-2">
               <button
-                onClick={() => setLiveThetaValue(0.02)}
+                onClick={() => setLiveThetaValue(0)}
                 disabled={!isStateConsistent}
                 className={`text-xs px-2 py-1 rounded ${
                   isStateConsistent
-                    ? 'bg-blue-200 text-blue-800 hover:bg-blue-300 cursor-pointer'
+                    ? 'bg-green-200 text-green-800 hover:bg-green-300 cursor-pointer'
                     : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-50'
                 }`}
               >
-                Lenient (0.02)
+                No Culling (0)
               </button>
               <button
-                onClick={() => setLiveThetaValue(0.1)}
+                onClick={() => setLiveThetaValue(0.25)}
                 disabled={!isStateConsistent}
                 className={`text-xs px-2 py-1 rounded ${
                   isStateConsistent
@@ -359,10 +362,10 @@ const ResultsDisplay: React.FC = () => {
                     : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-50'
                 }`}
               >
-                Default (0.1)
+                Light (0.25)
               </button>
               <button
-                onClick={() => setLiveThetaValue(0.3)}
+                onClick={() => setLiveThetaValue(0.5)}
                 disabled={!isStateConsistent}
                 className={`text-xs px-2 py-1 rounded ${
                   isStateConsistent
@@ -370,7 +373,18 @@ const ResultsDisplay: React.FC = () => {
                     : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-50'
                 }`}
               >
-                Strict (0.3)
+                Medium (0.5)
+              </button>
+              <button
+                onClick={() => setLiveThetaValue(0.8)}
+                disabled={!isStateConsistent}
+                className={`text-xs px-2 py-1 rounded ${
+                  isStateConsistent
+                    ? 'bg-blue-200 text-blue-800 hover:bg-blue-300 cursor-pointer'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-50'
+                }`}
+              >
+                Heavy (0.8)
               </button>
             </div>
           </div>

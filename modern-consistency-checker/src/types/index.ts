@@ -120,6 +120,7 @@ export interface ConsistencyStore {
   isProcessing: boolean;
   error: string | null;
   apiKey: string;
+  selectedProvider: string;
   selectedModel: string;
   analysisEmphasis: AnalysisEmphasis;
   sessionCost: number;
@@ -143,6 +144,7 @@ export interface ConsistencyStore {
   setIsProcessing: (processing: boolean) => void;
   setError: (error: string | null) => void;
   setApiKey: (key: string) => void;
+  setSelectedProvider: (provider: string) => void;
   setSelectedModel: (model: string) => void;
   setAnalysisEmphasis: (emphasis: AnalysisEmphasis) => void;
   setNumberOfPasses: (passes: 1 | 2 | 3) => void;

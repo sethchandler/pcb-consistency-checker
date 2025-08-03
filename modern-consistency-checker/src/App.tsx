@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useConsistencyStore } from './store/useConsistencyStore';
 import FileUpload from './components/FileUpload';
-import ApiKeyInput from './components/ApiKeyInput';
+import ModelConfiguration from './components/ModelConfiguration';
 import PromptEditor from './components/PromptEditor';
 import AnalysisEmphasis from './components/AnalysisEmphasis';
 import PassConfiguration from './components/PassConfiguration';
@@ -40,7 +40,7 @@ function App() {
             {/* Left Column */}
             <div className="space-y-6">
               <FileUpload />
-              <ApiKeyInput />
+              <ModelConfiguration />
               <CostTracker />
               <AnalysisEmphasis />
             </div>
